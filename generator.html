@@ -1,0 +1,1605 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>학사일정 · 수업일수표 생성기</title>
+<style>
+  :root{
+    --bg:#e9e9e9; --surface:#ffffff; --panel:#eef0f2;
+    --text:#171717; --muted:#555555; --faint:#888888;
+    --border:#b9b9b9; --border-strong:#6f6f6f; --grid:#4d4d4d;
+    --accent:#0072C6; --accent-dark:#005a9e; --accent-soft:#d9ebfb; --accent-line:#0072C6;
+    --sun:#E51400; --sat:#1B6EC2;
+    --off-bg:#fcdedd; --off-text:#D11400;
+    --mark-bg:#dcf1d6; --mark-line:#3F9C35; --mark-text:#1E7A1E;
+    --exam-bg:#cdecf7; --exam-text:#0e7fa3;     /* 시험: 청록(하늘) */
+    --event-bg:#fbe7cb; --event-text:#b9690f;   /* 행사: 주황 */
+    --head-bg:#ffe680; --head-text:#1a1a1a;      /* 표 머리글: 노랑 */
+    --radius:0; --shadow:none;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Pretendard","Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",-apple-system,
+                BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  .icon{width:1em;height:1em;stroke:currentColor;stroke-width:1.7;fill:none;
+        stroke-linecap:round;stroke-linejoin:round;vertical-align:-.13em;flex:0 0 auto}
+
+  /* ---------- header ---------- */
+  header.app{
+    display:flex;align-items:center;gap:14px;
+    padding:18px 28px;background:var(--surface);border-bottom:1px solid var(--border);
+  }
+  header.app .logo{
+    width:40px;height:40px;border-radius:11px;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;
+  }
+  header.app h1{font-size:17px;margin:0;font-weight:700;letter-spacing:-.2px}
+  .ver{display:inline-block;font-size:11px;font-weight:800;color:#fff;background:#E51400;
+       padding:2px 8px;margin-left:6px;vertical-align:middle;letter-spacing:.3px}
+  header.app p{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
+  header.app .spacer{flex:1}
+  .btn{
+    display:inline-flex;align-items:center;gap:7px;cursor:pointer;
+    border:1px solid var(--border-strong);background:var(--surface);color:var(--text);
+    padding:9px 14px;border-radius:9px;font-size:13px;font-weight:600;font-family:inherit;
+    transition:background .12s,border-color .12s,box-shadow .12s;white-space:nowrap;
+  }
+  .btn:hover{background:var(--accent-soft);border-color:var(--accent-line)}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.primary:hover{background:#2f3c52}
+  .btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+  .btn.ghost:hover{background:var(--accent-soft);color:var(--text)}
+  .btn .icon{font-size:15px}
+
+  /* ---------- toolbar ---------- */
+  .toolbar{
+    display:flex;flex-wrap:wrap;align-items:flex-end;gap:18px;
+    padding:16px 28px;background:var(--surface);border-bottom:1px solid var(--border);
+  }
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field > label{font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.2px;
+                 text-transform:uppercase;display:flex;align-items:center;gap:5px}
+  .control,select.control,input.control{
+    border:1px solid var(--border-strong);background:var(--surface);color:var(--text);
+    padding:8px 11px;border-radius:8px;font-size:13.5px;font-family:inherit;height:38px;
+  }
+  .control:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  select.control{cursor:pointer;min-width:118px}
+  input[type=date].control{min-width:160px}
+  /* 날짜 입력 : 자유 입력(붙여넣기 가능) + 달력 버튼 */
+  .dwrap{position:relative;display:flex;align-items:center;min-width:0}
+  .field > .dwrap > .control{width:158px}
+  .dwrap .control{flex:1;min-width:0;padding-right:36px}
+  .dwrap .dpick{position:absolute;right:1px;top:1px;bottom:1px;width:32px;border:0;
+    border-left:1px solid var(--border-strong);background:var(--panel);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:15px;border-radius:0}
+  .dwrap .dpick:hover{background:var(--accent-soft)}
+  .dwrap .dnative{position:absolute;right:0;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0;margin:0}
+  .minifield .dwrap{width:100%}
+
+  .seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:9px;
+       overflow:hidden;background:var(--surface);height:38px}
+  .seg button{border:0;background:transparent;padding:0 18px;font-size:13.5px;font-weight:600;
+              cursor:pointer;color:var(--muted);font-family:inherit}
+  .seg button.on{background:var(--accent);color:#fff}
+
+  /* ---------- layout ---------- */
+  .layout{display:grid;grid-template-columns:340px 1fr;gap:22px;padding:22px 28px;align-items:start}
+  @media (max-width:1080px){.layout{grid-template-columns:1fr}}
+
+  /* ---------- 작업 영역 고정 : 스크롤해도 툴바·사이드바·요약이 화면에 유지 (넓은 화면 전용) ---------- */
+  @media (min-width:1081px){
+    .toolbar{position:sticky;top:0;z-index:40}
+    .maintop{position:sticky;top:var(--stickytop,72px);z-index:25;
+      background:var(--bg);padding-top:10px;margin-top:-10px;padding-bottom:2px}
+    .sidebar{position:sticky;top:calc(var(--stickytop,72px) + 14px);
+      max-height:calc(100vh - var(--stickytop,72px) - 28px);overflow:auto;padding-right:2px}
+  }
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+        box-shadow:var(--shadow)}
+  .card .hd{display:flex;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .card .hd h2{font-size:13.5px;margin:0;font-weight:700;letter-spacing:-.1px}
+  .card .hd .count{margin-left:auto;font-size:11.5px;color:var(--faint);font-weight:600;
+        background:var(--accent-soft);padding:2px 9px;border-radius:20px}
+  .card .bd{padding:14px 16px}
+
+  /* ---------- sidebar ---------- */
+  .sidebar{display:flex;flex-direction:column;gap:18px}
+  .addform{display:grid;grid-template-columns:1fr;gap:9px;margin-bottom:6px}
+  .addform .row{display:flex;gap:8px}
+  .addform input,.addform select{flex:1;min-width:0}
+  .seg.kind{height:36px;width:100%}
+  .seg.kind button{flex:1;padding:0 4px;font-size:12.5px}
+
+  .itemlist{display:flex;flex-direction:column;gap:7px;max-height:430px;overflow:auto;margin:-2px -4px;padding:2px 4px}
+  .itemlist::-webkit-scrollbar{width:8px}
+  .itemlist::-webkit-scrollbar-thumb{background:#dfe3ea;border-radius:8px}
+  .item{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border);
+        border-radius:9px;background:var(--panel)}
+  .item .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .item .meta{flex:1;min-width:0}
+  .item .nm{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item .dt{font-size:11.5px;color:var(--muted)}
+  .item .tag{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:6px;flex:0 0 auto}
+  .tag.law{background:#fbeceb;color:#b04138}
+  .tag.sub{background:#fdf3e7;color:#a96a1f}
+  .tag.off{background:#eef1f6;color:#4a586e}
+  .tag.event{background:#edf1f6;color:#42597a}
+  .tag.exam{background:var(--exam-bg);color:var(--exam-text)}
+  .tag.makeup{background:#f0e4f8;color:#68217A}
+  .tag.admin{background:#e8ecf0;color:#44546a}
+  .item .x{cursor:pointer;color:var(--faint);display:flex;padding:3px;border-radius:6px}
+  .item .x:hover{color:var(--sun);background:#fbeceb}
+  .toggle{position:relative;width:38px;height:22px;border-radius:20px;background:#d4d9e2;
+          cursor:pointer;flex:0 0 auto;transition:background .15s}
+  .toggle.on{background:var(--accent)}
+  .toggle::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+          background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+  .toggle.on::after{left:18px}
+  .hint{font-size:11.5px;color:var(--faint);margin-top:4px}
+  .empty{font-size:12.5px;color:var(--faint);text-align:center;padding:18px 0}
+
+  /* ---------- summary cards ---------- */
+  .summary{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px}
+  @media (max-width:900px){.summary{grid-template-columns:repeat(3,1fr)}}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+        padding:13px 15px;box-shadow:var(--shadow)}
+  .stat .k{font-size:11.5px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:5px}
+  .stat .v{font-size:21px;font-weight:800;letter-spacing:-.5px;margin-top:4px}
+  .stat .v small{font-size:12px;font-weight:600;color:var(--muted)}
+  .stat.hl{background:var(--mark-bg);border-color:var(--mark-line)}
+  .stat.hl .v{color:var(--mark-text)}
+
+  /* 수업일수표 : 화면에서는 현재 학기만 표시 (인쇄 시 두 학기 모두) */
+  .semtbl{display:none}
+  .semtbl.cur{display:block}
+
+  /* ---------- view tabs ---------- */
+  .viewtabs{display:flex;gap:4px;margin-bottom:14px}
+  .viewtabs button{border:1px solid var(--border);background:var(--surface);padding:8px 16px;
+        border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);
+        font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+  .viewtabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  /* ---------- week table ---------- */
+  .tablewrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+        box-shadow:var(--shadow);overflow:hidden}
+  .ttitle{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px}
+  .ttitle h3{margin:0;font-size:14px;font-weight:700}
+  .ttitle .sub{font-size:12px;color:var(--muted)}
+  table.weeks{width:100%;border-collapse:collapse;font-size:13px}
+  table.weeks th,table.weeks td{border:1px solid var(--border);padding:9px 6px;text-align:center}
+  table.weeks thead th{background:var(--panel);font-weight:700;font-size:12.5px;color:var(--muted);
+        padding:11px 6px}
+  table.weeks th.sun,table.weeks td.suncol{color:var(--sun)}
+  table.weeks th.sat,table.weeks td.satcol{color:var(--sat)}
+  table.weeks td.wk{background:var(--panel);font-weight:700;color:var(--accent);width:56px}
+  table.weeks td.day{position:relative;font-weight:600;min-width:74px}
+  table.weeks td.off{background:var(--off-bg);color:var(--faint)}
+  table.weeks td.off .d{text-decoration:line-through;text-decoration-color:var(--faint)}
+  table.weeks td.off .oname{display:block;font-size:10px;color:#b0707a;font-weight:600;margin-top:1px;text-decoration:none}
+  table.weeks td.mark{background:var(--mark-bg)}
+  table.weeks td.mark .badge{display:inline-block;font-size:9.5px;font-weight:800;color:#fff;
+        background:var(--mark-text);border-radius:5px;padding:1px 5px;margin-top:2px}
+  table.weeks td.end .badge{background:var(--accent)}
+  table.weeks td.bigo{text-align:left;font-size:12px;color:var(--text);min-width:150px;max-width:230px;font-weight:500}
+  table.weeks td.bigo .chip{display:inline-block;margin:1px 3px 1px 0;font-size:11px;padding:1px 7px;border-radius:6px;
+        background:var(--accent-soft);color:#42526b;font-weight:600}
+  table.weeks td.bigo .chip.exam{background:var(--exam-bg);color:var(--exam-text)}
+  table.weeks td.bigo .chip.mk{background:#f0e4f8;color:#68217A}
+  table.weeks td.bigo .chip.q{background:var(--mark-bg);color:var(--mark-text)}
+  table.weeks tbody tr:hover td{background:#fafbfd}
+  table.weeks tbody tr:hover td.off{background:#eef0f3}
+  table.weeks tbody tr:hover td.mark{background:#e8efe9}
+
+  .tfoot{padding:12px 18px;border-top:1px solid var(--border);background:var(--panel);
+        font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center}
+  .tfoot b{color:var(--text)}
+  .tfoot .q{color:var(--mark-text);font-weight:700}
+
+  /* holiday summary (요일별) */
+  .holsum{margin-top:18px}
+  table.hs{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.hs th,table.hs td{border:1px solid var(--border);padding:8px;text-align:center;vertical-align:top}
+  table.hs th{background:var(--panel);font-weight:700;color:var(--muted)}
+  table.hs td .hd2{font-weight:700}
+  table.hs td .nm2{font-size:11px;color:var(--muted);display:block;margin-top:2px}
+
+  /* ---------- month calendar ---------- */
+  .calhead{margin-bottom:14px}
+  .calhead h2{font-size:18px;font-weight:800;text-align:center;margin:0;letter-spacing:-.3px}
+  .months{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  @media (max-width:760px){.months{grid-template-columns:1fr}}
+  .month{background:var(--surface);border:1px solid var(--border-strong);overflow:hidden}
+  .month .mh{padding:11px 14px;font-weight:800;font-size:14.5px;border-bottom:1px solid var(--border-strong);
+        display:flex;align-items:center;gap:7px;background:var(--panel)}
+  table.cal{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+  table.cal th{padding:8px 0;font-size:11.5px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--border)}
+  table.cal th.sun,table.cal td.sun{color:var(--sun)}
+  table.cal th.sat,table.cal td.sat{color:var(--sat)}
+  table.cal td{height:68px;vertical-align:top;padding:5px 6px;border:1px solid var(--border)}
+  table.cal td .n{font-weight:700;font-size:13px}
+  table.cal td.ho{background:#fcf0ef}
+  table.cal td.ho .n{color:var(--sun)}
+  table.cal td.ev{background:var(--event-bg)}
+  table.cal td.term{background:var(--mark-bg)}
+  table.cal td.term .n{color:var(--mark-text)}
+  table.cal td .lbl{display:block;font-size:10px;line-height:1.25;margin-top:3px;font-weight:700;
+        white-space:normal;word-break:keep-all}
+  table.cal td.ho .lbl{color:#b0473f}
+  table.cal td.ev .lbl{color:#42597a}
+  table.cal td.term .lbl{color:var(--mark-text)}
+  table.cal td.out{background:#fafbfc}
+  table.cal td.out .n{color:#cdd2da}
+
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .legend i{width:13px;height:13px;border-radius:4px;display:inline-block;border:1px solid var(--border-strong)}
+
+  /* ---------- toast ---------- */
+  #toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
+        background:var(--accent);color:#fff;padding:11px 20px;border-radius:10px;font-size:13px;
+        font-weight:600;opacity:0;pointer-events:none;transition:.25s;box-shadow:0 6px 20px rgba(20,30,50,.25);z-index:50}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ===== 직사각형 레이어 (라운드/그림자 제거) ===== */
+  .card,.btn,.control,select.control,input.control,.seg,.item,.tag,.toggle,.toggle::after,
+  .stat,.tablewrap,.month,.viewtabs button,#toast,header.app .logo,.card .hd .count,
+  table.weeks td.bigo .chip,table.weeks td.mark .badge,.legend i,.addform .btn,.empty{
+    border-radius:0!important;
+  }
+  .card,.tablewrap,.stat,.month,#toast{box-shadow:none!important}
+  .card,.stat,.tablewrap{border-color:var(--border-strong)}
+  /* 직접추가: grid 트랙이 컨테이너를 넘지 않도록 (오버플로우 방지) */
+  .addform{grid-template-columns:minmax(0,1fr)}
+  .addform .row{min-width:0}
+  /* 직접추가 종류 선택: 3등분 직사각형, 경계 명확 */
+  .seg.kind{display:flex;width:100%;box-sizing:border-box;border-radius:0}
+  .seg.kind button{flex:1 1 0;min-width:0;box-sizing:border-box;border-right:1px solid var(--border-strong)}
+  .seg.kind button:last-child{border-right:0}
+
+  /* ===== Windows 8 원색 테마 + 또렷한 선 ===== */
+  /* 솔리드 컬러 헤더 (타일 느낌) */
+  .card .hd,.ttitle{background:var(--accent);border-bottom:0}
+  .card .hd h2,.ttitle h3{color:#fff}
+  .card .hd .icon,.ttitle .icon{color:#fff!important;stroke:#fff}
+  .ttitle .sub{color:#d7e9fb}
+  .card .hd .count{background:rgba(255,255,255,.25);color:#fff}
+  header.app .logo{background:var(--accent)}
+  /* 또렷한 표 선 */
+  .tablewrap{border:2px solid var(--border-strong)}
+  table.weeks th,table.weeks td{border:1px solid var(--grid)}
+  table.weeks thead th{background:var(--head-bg);color:var(--head-text);border-color:var(--grid)}
+  table.weeks td.exam{background:#a9dcf1}
+  table.weeks td.exam .ename{display:block;font-size:8.5px;font-weight:800;line-height:1.05;margin-top:1px;
+    color:#085a75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.weeks td.makeup{background:#e3d3f2}
+  table.weeks td.makeup .ename{display:block;font-size:8.5px;font-weight:800;line-height:1.05;margin-top:1px;
+    color:#68217A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.weeks td.wk{background:var(--accent-soft);color:var(--accent-dark);font-weight:800}
+  /* 공휴일/휴업일 : 그냥 빨간색 */
+  table.weeks td.off{background:var(--off-bg)!important;color:var(--off-text)!important}
+  table.weeks td.off .d{text-decoration:none;color:var(--off-text);font-weight:800}
+  table.weeks td.off .oname{color:var(--off-text);font-weight:700}
+  /* 분기/종강 */
+  table.weeks td.mark{background:var(--mark-bg)}
+  table.weeks td.mark .badge{background:var(--mark-line);color:#fff;font-weight:800}
+  table.weeks td.end .badge{background:var(--accent)}
+  table.weeks td.bigo .chip.q{background:var(--mark-bg);color:var(--mark-text)}
+  /* 요약 타일 */
+  .stat{border:2px solid var(--border-strong)}
+  .stat.hl{background:var(--mark-line);border-color:var(--mark-line)}
+  .stat.hl .k,.stat.hl .v,.stat.hl .v small{color:#fff!important}
+  .stat.hl .icon{color:#fff!important;stroke:#fff}
+  /* 토글/세그먼트/버튼 원색 */
+  .toggle.on{background:var(--accent)}
+  .seg button.on,.viewtabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.primary{background:var(--accent);border-color:var(--accent)}
+  .btn.primary:hover{background:var(--accent-dark)}
+  /* 달력 또렷한 선 + 헤더 컬러 */
+  .month{border:2px solid var(--border-strong)}
+  .month .mh{background:var(--accent);color:#fff;border-bottom:0}
+  .month .mh .icon{color:#fff!important;stroke:#fff}
+  table.cal th,table.cal td{border:1px solid var(--grid)}
+  table.cal td.ho{background:var(--off-bg)}
+  table.cal td.ho .n,table.cal td.ho .lbl{color:var(--off-text)}
+  table.cal td.term{background:var(--mark-bg)}
+  table.cal td.term .n,table.cal td.term .lbl{color:var(--mark-text);font-weight:800}
+  table.cal td.exam{background:var(--exam-bg)}
+  table.cal td.exam .n,table.cal td.exam .lbl{color:var(--exam-text);font-weight:700}
+  table.cal td.ev .n,table.cal td.ev .lbl{color:var(--event-text);font-weight:700}
+  table.cal td.mk{background:#efe3f8}
+  table.cal td.mk .n,table.cal td.mk .lbl{color:#68217A;font-weight:700}
+  table.cal td.adm .n,table.cal td.adm .lbl{color:#757575;font-weight:700}
+  table.cal td .lbl.adm-lbl{color:#757575;font-weight:700}
+  /* 휴일 요약표 (이미지2 형식) */
+  .holsum{margin-top:18px;border:2px solid var(--border-strong);background:var(--surface)}
+  .holsum .ttl{background:var(--accent);color:#fff;font-weight:800;padding:10px 14px}
+  table.hs{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.hs th,table.hs td{border:1px solid var(--grid);padding:8px;text-align:center;vertical-align:middle}
+  table.hs th{background:var(--head-bg);color:var(--head-text);font-weight:800}
+  table.hs td.lab{background:var(--accent-soft);color:var(--accent-dark);font-weight:800;font-size:13px}
+  table.hs td .hday{font-weight:800;color:var(--off-text)}
+  table.hs td .hname{font-size:11px;color:var(--off-text);display:block;margin-top:2px}
+  table.hs td.note{text-align:left;color:var(--off-text);font-weight:700;font-size:12px;vertical-align:top}
+  .holsum .hsnote{padding:9px 12px;font-size:12.5px;color:var(--text);font-weight:600;border-top:1px solid var(--border)}
+  /* 주요 학사일정 리스트 */
+  .schedule{margin-top:18px;border:2px solid var(--border-strong);background:var(--surface)}
+  .schedule .ttl{background:var(--accent);color:#fff;font-weight:800;padding:10px 14px;display:flex;align-items:center;gap:8px}
+  .schedule .ttl .icon{color:#fff;stroke:#fff}
+  .schedule .list{padding:12px 16px;column-count:3;column-gap:26px}
+  @media (max-width:900px){.schedule .list{column-count:2}}
+  @media (max-width:560px){.schedule .list{column-count:1}}
+  .schedule .row{break-inside:avoid;display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .schedule .row .dt{color:var(--accent-dark);font-weight:800;white-space:nowrap;min-width:80px}
+  .schedule .row .nm{color:var(--text)}
+  .schedule .row.hol .dt,.schedule .row.hol .nm{color:var(--off-text);font-weight:700}
+  .schedule .row.term .dt,.schedule .row.term .nm{color:var(--mark-text);font-weight:800}
+  .schedule .row.exam .dt,.schedule .row.exam .nm{color:var(--exam-text);font-weight:700}
+  .schedule .row.event .dt,.schedule .row.event .nm{color:var(--event-text);font-weight:700}
+  .schedule .row.mk .dt,.schedule .row.mk .nm{color:#68217A;font-weight:700}
+  .schedule .row.adm .dt,.schedule .row.adm .nm{color:#44546a;font-weight:700}
+
+  /* 입력폼 시작/종료일 */
+  .minifield{display:flex;flex-direction:column;gap:4px;flex:1 1 0;min-width:0}
+  .minifield > span{font-size:11px;color:var(--muted);font-weight:700}
+  .minifield > span em{color:var(--faint);font-style:normal;font-weight:500}
+  .minifield .control{flex:0 0 auto;width:100%}
+  /* 분기/종강 배지: 깔끔하게 한 줄 아래로 */
+  table.weeks td.mark .badge,table.weeks td.end .badge{display:block;width:fit-content;margin:3px auto 0;padding:1px 6px;font-size:9px}
+  /* 테두리 잘림 방지 + 표 선 균일 */
+  .tablewrap,.month{overflow:visible}
+  table.weeks thead th{border-color:var(--grid)}
+  /* 달력 아래 주요 학사일정 (해당 달 일정) */
+  .month .mevents{border-top:2px solid var(--border-strong);padding:8px 11px;background:var(--surface)}
+  .month .mevents .me{display:flex;gap:9px;align-items:baseline;padding:4px 0 4px 9px;font-size:12.5px;line-height:1.35;border-left:4px solid var(--border-strong)}
+  .month .mevents .me + .me{margin-top:3px}
+  .month .mevents .me .med{color:var(--text);font-weight:800;white-space:nowrap;min-width:68px}
+  .month .mevents .me .men{color:var(--text)}
+  .month .mevents .me.hol{border-left-color:var(--off-text)}
+  .month .mevents .me.hol .med,.month .mevents .me.hol .men{color:var(--off-text);font-weight:800}
+  .month .mevents .me.exam{border-left-color:var(--exam-text)}
+  .month .mevents .me.exam .med,.month .mevents .me.exam .men{color:var(--exam-text);font-weight:800}
+  .month .mevents .me.event{border-left-color:var(--event-text)}
+  .month .mevents .me.event .med,.month .mevents .me.event .men{color:var(--event-text);font-weight:800}
+  .month .mevents .me.term{border-left-color:var(--mark-line)}
+  .month .mevents .me.term .med,.month .mevents .me.term .men{color:var(--mark-text);font-weight:800}
+  .month .mevents .me.mk{border-left-color:#68217A}
+  .month .mevents .me.mk .med,.month .mevents .me.mk .men{color:#68217A;font-weight:800}
+  .month .mevents .me.adm{border-left-color:#44546a}
+  .month .mevents .me.adm .med,.month .mevents .me.adm .men{color:#44546a;font-weight:700}
+  .month .mevents .none{font-size:11.5px;color:var(--faint);text-align:center}
+  /* 인쇄 설정 안내 바 */
+  .printtip{display:flex;align-items:center;gap:10px;margin:14px 28px 0;padding:11px 15px;
+    background:var(--accent-soft);border:1px solid var(--accent-line);color:#1f2d3d;font-size:12.5px;line-height:1.45}
+  .printtip .icon{font-size:18px;color:var(--accent);flex:0 0 auto}
+  .printtip b{color:var(--accent-dark)}
+  /* 수업일수(요일별 목표 주차) 점검 패널 */
+  #weekcheck{margin-bottom:18px;border:2px solid;padding:12px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  #weekcheck:empty{display:none}
+  #weekcheck.ok{border-color:var(--mark-line);background:var(--mark-bg)}
+  #weekcheck.warn{border-color:var(--sun);background:#fdecea}
+  #weekcheck.over{border-color:#c8881f;background:#fdf4e3}
+  #weekcheck.over .hd,#weekcheck.over .msg{color:#8a5a12}
+  #weekcheck .wdchip.over{color:#8a5a12;border-color:#d8a23f;background:#fbeecb}
+  #weekcheck .hd{font-weight:800;font-size:13.5px;display:flex;align-items:center;gap:8px}
+  #weekcheck .hd .icon{font-size:18px}
+  #weekcheck.ok .hd{color:var(--mark-text)}
+  #weekcheck.warn .hd{color:#b3261e}
+  #weekcheck .wdchips{display:flex;gap:8px;flex-wrap:wrap}
+  #weekcheck .wdchip{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:800;
+    padding:5px 11px;border:1.5px solid var(--border-strong);background:#fff;color:var(--text)}
+  #weekcheck .wdchip.good{color:var(--mark-text);border-color:var(--mark-line)}
+  #weekcheck .wdchip.bad{color:#fff;background:var(--sun);border-color:var(--sun)}
+  #weekcheck .msg{flex-basis:100%;font-size:12.5px;font-weight:700}
+  #weekcheck.warn .msg{color:#b3261e}
+  #weekcheck.ok .msg{color:var(--mark-text)}
+
+  /* ===== 테두리 안 사라짐: collapse 대신 separate 모델 + 셀별 명시 테두리 ===== */
+  table.weeks,table.hs,table.cal{border-collapse:separate !important;border-spacing:0 !important;
+    border-top:1px solid var(--grid);border-left:1px solid var(--grid)}
+  table.weeks th,table.weeks td,table.hs th,table.hs td,table.cal th,table.cal td{
+    box-sizing:border-box !important;border:0 !important;
+    border-right:1px solid var(--grid) !important;border-bottom:1px solid var(--grid) !important}
+  /* 셀 내부 글자/배지가 테두리 침범 못 하게: 음수마진 금지 + 줄간격·여백 확보 */
+  table.weeks td.day{line-height:1.4}
+  table.weeks td.mark .badge,table.weeks td.end .badge{position:relative;z-index:1;display:block;margin:4px auto 0 !important}
+  table.weeks td.off .oname{margin-top:3px !important;line-height:1.3}
+  table.cal td{line-height:1.32}
+  table.cal td .lbl{margin-top:2px}
+
+  /* ===== 수업일수표: 칸 크기 균일 + 부가 글씨 작게(고정칸 안에 맞춤) ===== */
+  table.weeks{table-layout:fixed}
+  table.weeks th:first-child,table.weeks td.wk{width:6.5%}
+  table.weeks th:last-child,table.weeks td.bigo{width:21%}
+  table.weeks th,table.weeks td{height:50px;vertical-align:middle;padding:2px 5px;overflow:hidden}
+  table.weeks thead th{height:40px}
+  table.weeks td .d{display:block;font-size:14px;font-weight:700;line-height:1.15}
+  table.weeks td.off .oname{display:block;font-size:8.5px;font-weight:700;line-height:1.05;margin:1px 0 0!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.weeks td.mark .badge,table.weeks td.end .badge{font-size:8px!important;padding:0 5px!important;margin:1px auto 0!important;line-height:1.45}
+  table.weeks td.bigo{font-size:10px;line-height:1.18}
+  table.weeks td.bigo .chip{font-size:9px;padding:1px 5px;margin:1px 2px 1px 0}
+
+  /* ===== 인쇄 / PDF : [1장] 수업일수표 · [2~3장] 학사월력 (A4) ===== */
+  @media print{
+    @page{size:A4 portrait;margin:7mm}
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    /* 행·표·달력 박스가 페이지 경계에서 절대 잘리지 않도록 */
+    table.weeks tr,table.hs tr,table.cal tr{ page-break-inside:avoid !important; break-inside:avoid !important; }
+    .tablewrap,.holsum,.month{ page-break-inside:avoid !important; break-inside:avoid !important; }
+    thead{ display:table-header-group; }
+    header.app,.toolbar,.sidebar,.maintop,.viewtabs,.addform,.legend,.summary,#weekcheck,.schedule,#toast,.no-print{display:none!important}
+    .layout{display:block;padding:0}
+    main{width:100%}
+    body{background:#fff;color:#000}
+
+    /* --- 공통 : 흰 바탕 + 진한 검정 선 (separate 모델: 셀은 오른쪽·아래만, 표는 위·왼쪽) --- */
+    .tablewrap,.holsum,.month{ background:#fff !important; border:1.4pt solid #000 !important; }
+    table.weeks,table.hs,table.cal{ border-top:0.75pt solid #000 !important; border-left:0.75pt solid #000 !important; }
+    table.weeks th,table.weeks td,table.hs th,table.hs td,table.cal th,table.cal td{
+      border:0 !important; border-right:0.75pt solid #000 !important; border-bottom:0.75pt solid #000 !important; }
+    .tfoot,.hsnote{ background:#fff !important; }
+
+    /* ============ [1~2장] 수업일수표 : 1·2학기 연속 출력, 시인성 강화 ============ */
+    #viewTable{display:block!important;page-break-after:always;break-after:page}
+    #viewTable .semtbl{display:block!important}
+    .semtbl.has2{page-break-before:always;break-before:page}
+    /* 분리 인쇄 : 버튼에 따라 한 종류만 출력 (Ctrl+P 직접 인쇄 시엔 둘 다) */
+    body.print-table #viewCal{display:none!important}
+    body.print-table #viewTable{page-break-after:auto!important;break-after:auto!important}
+    body.print-cal #viewTable{display:none!important}
+    /* 제목 : 파랑 띠 + 흰 글씨 */
+    .ttitle{background:var(--accent)!important;border-bottom:0;padding:8px 15px}
+    .ttitle h3{color:#fff!important;font-size:14.5pt}
+    .ttitle .sub{color:#d9ecff!important;font-size:10pt}
+    .ttitle .icon{color:#fff!important;stroke:#fff!important}
+    /* 머리글 : 노랑 + 검정 굵게 */
+    table.weeks thead th{height:9mm;background:var(--head-bg)!important;color:#000!important;font-size:11.5pt;font-weight:800!important}
+    /* 본문 : 큰 글씨 + 순검정 */
+    table.weeks{font-size:11pt}
+    table.weeks th,table.weeks td{height:11mm;padding:1px 4px;vertical-align:middle;color:#000!important}
+    table.weeks td .d{font-size:12pt;color:#000}
+    /* 17주 이상 긴 학기 : 칸 높이를 줄여 휴일 안내표까지 한 장 유지 */
+    .tablewrap.compact table.weeks th,.tablewrap.compact table.weeks td{height:9.6mm}
+    .tablewrap.compact table.weeks td .d{font-size:11pt}
+    table.weeks td.wk{background:#d9ebfb!important;color:#00427e!important;font-size:11.5pt;font-weight:800!important}
+    /* 휴업일 : 연빨강 바탕 + 진빨강 글씨 */
+    table.weeks td.off{background:#ffe1e0!important;color:#b30000!important}
+    table.weeks td.off .d{color:#b30000!important;font-weight:800}
+    table.weeks td.off .oname{color:#b30000!important;font-size:8pt;font-weight:800;margin:1px 0 0!important}
+    /* 시험 : 진한 하늘 바탕 + 칸마다 시험명 표기 */
+    table.weeks td.exam{background:#b0e0f4!important}
+    table.weeks td.exam .ename{color:#085a75!important;font-size:8pt;font-weight:800;margin:1px 0 0}
+    /* 보강 : 연보라 바탕 + 보강명 표기 */
+    table.weeks td.makeup{background:#e4d4f4!important}
+    table.weeks td.makeup .ename{color:#5e1f6e!important;font-size:8pt;font-weight:800;margin:1px 0 0}
+    /* 수업일수 1/4~3/4 · 종강 : 연초록 바탕 + 진한 단색 배지 */
+    table.weeks td.mark{background:#e0f3da!important}
+    table.weeks td.mark .badge{background:#1b7a1b!important;color:#fff!important;border:0!important;
+      font-size:8pt!important;padding:1.5px 6px!important;margin:1.5px auto 0!important;line-height:1.3}
+    table.weeks td.end .badge{background:#00427e!important}
+    /* 비고 */
+    table.weeks td.bigo{font-size:9.5pt;color:#000!important}
+    table.weeks td.bigo .chip{background:#fff!important;color:#000!important;border:0.6pt solid #666!important;font-size:8.5pt;padding:1px 5px}
+    table.weeks td.bigo .chip.exam{color:#0b6e8f!important;border-color:#0b6e8f!important}
+    table.weeks td.bigo .chip.q{color:#1b7a1b!important;border-color:#1b7a1b!important}
+    table.weeks td.bigo .chip.mk{color:#5e1f6e!important;border-color:#5e1f6e!important}
+    /* 하단 요약 */
+    .tfoot{font-size:10.5pt;padding:9px 15px;color:#000!important;border-top:0.75pt solid #000}
+    .tfoot b{color:#000}
+    .tfoot .q{color:#1b7a1b!important;font-weight:800}
+
+    /* 휴일 요약표 (수업일수표 같은 페이지) */
+    .holsum{margin-top:9px}
+    .holsum .ttl{background:var(--accent)!important;color:#fff!important;font-size:11.5pt;padding:6px 13px}
+    table.hs{font-size:10pt}
+    table.hs th{background:var(--head-bg)!important;color:#000!important;font-weight:800!important;padding:5px}
+    table.hs td{padding:5px;color:#000!important}
+    table.hs td.lab{background:#d9ebfb!important;color:#00427e!important;font-weight:800!important}
+    table.hs td .hday{color:#b30000!important;font-size:10.5pt}
+    table.hs td .hname{color:#b30000!important;font-size:9pt}
+    table.hs td.note{color:#b30000!important}
+    .holsum .hsnote{font-size:10pt;padding:6px 12px;color:#000!important;border-top:0.75pt solid #000}
+
+    /* ============ [2~3장] 학사월력 : 달력(좌) + 이달의 일정(우) 가로 밴드, 한 장에 3개월 ============ */
+    #viewCal{display:block!important}
+    .calhead{display:block!important;margin:3mm 0 6.5mm}
+    .calhead h2{font-size:15pt;color:#000;line-height:1.4}
+    .months{display:block!important}
+    .month{display:grid!important;grid-template-columns:63fr 37fr;grid-template-rows:auto 1fr;margin:0 0 3mm}
+    .month:nth-child(3n):not(:last-child){page-break-after:always;break-after:page}
+    .month .mh{grid-column:1/-1;background:var(--accent)!important;color:#fff!important;
+      font-size:12pt;padding:5px 12px;border-bottom:0}
+    .month .mh .icon{color:#fff!important;stroke:#fff!important}
+    table.cal{grid-row:2;grid-column:1;font-size:9.5pt}
+    table.cal th{background:var(--head-bg)!important;color:#000!important;font-size:9pt;font-weight:800;padding:3px 0}
+    table.cal td{height:10.5mm;padding:2px 3px;color:#000!important}
+    table.cal td .n{font-size:10pt;font-weight:800}
+    table.cal td .lbl{font-size:7.5pt;line-height:1.15;margin-top:1px;font-weight:700;letter-spacing:-.02em}
+    /* 일요일 빨강 · 토요일 파랑 (관례 색 유지) */
+    table.cal th.sun,table.cal td.sun{color:#c40000!important}
+    table.cal th.sat,table.cal td.sat{color:#1b6ec2!important}
+    /* 색 구분 : 휴일=빨강 / 개강·종강=초록 / 시험=하늘 / 행사=주황 */
+    table.cal td.ho{background:#ffe1e0!important}
+    table.cal td.ho .n,table.cal td.ho .lbl{color:#b30000!important}
+    table.cal td.term{background:#e0f3da!important}
+    table.cal td.term .n,table.cal td.term .lbl{color:#1b7a1b!important}
+    table.cal td.exam{background:#d3eef8!important}
+    table.cal td.exam .n,table.cal td.exam .lbl{color:#0b6e8f!important}
+    table.cal td.ev{background:#ffeed7!important}
+    table.cal td.ev .n,table.cal td.ev .lbl{color:#a35a00!important}
+    table.cal td.mk{background:#ecdff7!important}
+    table.cal td.mk .n,table.cal td.mk .lbl{color:#5e1f6e!important}
+    table.cal td.adm .n,table.cal td.adm .lbl{color:#6e6e6e!important}
+    /* 인쇄에서는 학사 텍스트를 칸에 표시하지 않음 (옆 '이달의 주요 일정' 목록으로 충분) */
+    table.cal .lbl.adm-lbl{display:none!important}
+    /* 월을 넘기는 기간 일정 : 인쇄에서는 시작 달 목록에만 표시 (중복 방지) */
+    .month .mevents .me.cont{display:none!important}
+    table.cal td.out{background:#f4f4f4!important}
+    table.cal td.out .n{color:#c2c2c2!important}
+    /* 오른쪽 : 이달의 주요 일정 */
+    .month .mevents{grid-row:2;grid-column:2;border-top:0!important;border-left:0.75pt solid #000!important;
+      padding:7px 10px;background:#fff!important}
+    .month .mevents::before{content:"이달의 주요 일정";display:block;font-size:9.5pt;font-weight:800;color:#000;
+      padding-bottom:3px;margin-bottom:5px;border-bottom:0.75pt solid #000}
+    .month .mevents .me{font-size:9pt;padding:2.5px 0 2.5px 7px;line-height:1.3;border-left:3px solid #888!important}
+    .month .mevents .me .med{min-width:58px;color:#000!important}
+    .month .mevents .me .men{color:#000!important}
+    .month .mevents .me.hol{border-left-color:#b30000!important}
+    .month .mevents .me.hol .med,.month .mevents .me.hol .men{color:#b30000!important}
+    .month .mevents .me.exam{border-left-color:#0b6e8f!important}
+    .month .mevents .me.exam .med,.month .mevents .me.exam .men{color:#0b6e8f!important}
+    .month .mevents .me.event{border-left-color:#a35a00!important}
+    .month .mevents .me.event .med,.month .mevents .me.event .men{color:#a35a00!important}
+    .month .mevents .me.term{border-left-color:#1b7a1b!important}
+    .month .mevents .me.term .med,.month .mevents .me.term .men{color:#1b7a1b!important}
+    .month .mevents .me.mk{border-left-color:#5e1f6e!important}
+    .month .mevents .me.mk .med,.month .mevents .me.mk .men{color:#5e1f6e!important}
+    .month .mevents .me.adm{border-left-color:#3c4a5a!important}
+    .month .mevents .me.adm .med,.month .mevents .me.adm .men{color:#3c4a5a!important}
+    .month .mevents .none{font-size:8.5pt;color:#666!important}
+  }
+</style>
+</head>
+<body>
+<header class="app">
+  <div class="logo">
+    <svg class="icon" style="font-size:22px" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h3M7.5 16.5h6"/></svg>
+  </div>
+  <div>
+    <h1>학사일정 · 수업일수표 생성기 <span class="ver">수정본 9/11-O</span></h1>
+    <p>연도와 개강·종강일만 정하면 요일기준 수업일수표가 자동으로 만들어집니다 · 입력값은 자동 저장됩니다(새로고침해도 유지)</p>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn" id="btnPrintTable"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg>수업일수표 인쇄</button>
+  <button class="btn" id="btnPrintCal"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>학사일정 인쇄</button>
+  <button class="btn primary" id="btnXls"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>엑셀 내보내기</button>
+  <button class="btn" id="btnShare"><svg class="icon" viewBox="0 0 24 24"><path d="M15 7a3 3 0 1 0 0-4 3 3 0 0 0 0 4zM6 14a3 3 0 1 0 0-4 3 3 0 0 0 0 4zm9 7a3 3 0 1 0 0-4 3 3 0 0 0 0 4zM8.6 10.5l4.8-2.7M8.6 13.5l4.8 2.7"/></svg>뷰어 공유 링크</button>
+  <button class="btn" id="btnData"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v10m0 0l-3.5-3.5M12 13l3.5-3.5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>뷰어 데이터 저장</button>
+  <a class="btn ghost" href="./" id="lnkViewer" title="열람 전용 페이지 열기"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/></svg>뷰어 열기</a>
+</header>
+
+<div class="toolbar">
+  <div class="field">
+    <label><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>학년도</label>
+    <select id="year" class="control"></select>
+  </div>
+  <div class="field">
+    <label><svg class="icon" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg>학기</label>
+    <div class="seg" id="semSeg">
+      <button data-sem="1" class="on">1학기</button>
+      <button data-sem="2">2학기</button>
+    </div>
+  </div>
+  <div class="field">
+    <label><svg class="icon" viewBox="0 0 24 24"><path d="M12 8v8m-4-4h8"/><circle cx="12" cy="12" r="9"/></svg>개강일</label>
+    <div class="dwrap"><input type="text" id="start" class="control" placeholder="2026-03-03" autocomplete="off"><button type="button" class="dpick" title="달력에서 선택"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg></button><input type="date" class="dnative" tabindex="-1"></div>
+  </div>
+  <div class="field">
+    <label><svg class="icon" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>종강일</label>
+    <div class="dwrap"><input type="text" id="end" class="control" placeholder="2026-06-22" autocomplete="off"><button type="button" class="dpick" title="달력에서 선택"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg></button><input type="date" class="dnative" tabindex="-1"></div>
+  </div>
+  <div class="field">
+    <label><svg class="icon" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/><path d="M19 15v6M16 18h6"/></svg>구성 주차 (휴일 제외)</label>
+    <select id="target" class="control">
+      <option value="14">14주</option>
+      <option value="15" selected>15주</option>
+      <option value="16">16주</option>
+      <option value="17">17주</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>&nbsp;</label>
+    <button class="btn ghost" id="btnReset"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/></svg>이 학기 기본값</button>
+  </div>
+  <div class="field">
+    <label>&nbsp;</label>
+    <button class="btn ghost" id="btnClearAll"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>전체 초기화</button>
+  </div>
+</div>
+
+<div class="printtip no-print">
+  <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.6h.01"/></svg>
+  <span><b>인쇄가 잘리거나 줄이 사라지면</b> — 인쇄 창의 <b>설정 더보기</b>에서 &nbsp;<b>용지: A4</b> &nbsp;·&nbsp; <b>여백: 없음(또는 최소)</b> &nbsp;·&nbsp; <b>머리글/바닥글: 끄기</b> &nbsp;·&nbsp; <b>배율: 100%(기본)</b> 로 맞추세요. 색까지 인쇄하려면 <b>배경 그래픽</b>도 켭니다.</span>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <section class="card">
+      <div class="hd">
+        <svg class="icon" style="font-size:16px;color:var(--accent)" viewBox="0 0 24 24"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1m0-12.8l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>
+        <h2>직접 추가</h2>
+      </div>
+      <div class="bd">
+        <div class="addform">
+          <div class="row">
+            <div class="minifield"><span>시작일</span><div class="dwrap"><input type="text" id="addDate" class="control" placeholder="4/20, 0420…" autocomplete="off"><button type="button" class="dpick" title="달력에서 선택"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg></button><input type="date" class="dnative" tabindex="-1"></div></div>
+            <div class="minifield"><span>종료일 <em>(선택)</em></span><div class="dwrap"><input type="text" id="addEnd" class="control" placeholder="4/24" autocomplete="off"><button type="button" class="dpick" title="달력에서 선택"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg></button><input type="date" class="dnative" tabindex="-1"></div></div>
+          </div>
+          <input type="text" id="addName" class="control" placeholder="명칭 (예: 중간고사, 수강신청)">
+          <div class="seg kind" id="addKind">
+            <button data-kind="off" class="on">휴업일</button>
+            <button data-kind="exam">시험</button>
+            <button data-kind="makeup">보강</button>
+            <button data-kind="event">행사</button>
+            <button data-kind="admin">학사</button>
+          </div>
+          <button class="btn primary" id="btnAdd" style="justify-content:center">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14"/></svg>추가하기</button>
+        </div>
+        <p class="hint">날짜는 <b>3/3 · 0303 · 2026-03-03</b> 어떤 형식이든 입력·붙여넣기 되고, <b>4/20~4/24</b>처럼 기간을 한 번에 넣어도 됩니다. 휴업일은 수업일수에서 제외됩니다.<br>
+        <b>보강</b> = 지정보강일(수업일수표에도 표시) · <b>학사</b> = 수강신청·복학신청 등 학사 주요일정(달력에 색칠 없이 "이름(~종료일)" 텍스트로만 표시)</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="hd">
+        <svg class="icon" style="font-size:16px;color:var(--accent)" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/><path d="M9 13l1.5 1.5L14 11"/></svg>
+        <h2>공휴일 (자동)</h2>
+        <span class="count" id="holCount">0</span>
+      </div>
+      <div class="bd">
+        <p class="hint" style="margin-top:0;margin-bottom:10px">스위치를 켜면 수업일수에서 제외됩니다. 학기 기간 내 공휴일만 표시돼요.</p>
+        <div class="itemlist" id="holList"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="hd">
+        <svg class="icon" style="font-size:16px;color:var(--accent)" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <h2>직접 추가한 일정</h2>
+        <span class="count" id="userCount">0</span>
+      </div>
+      <div class="bd">
+        <button class="btn" id="btnCopyPrev" style="width:100%;justify-content:center;margin-bottom:10px">
+          <svg class="icon" viewBox="0 0 24 24"><path d="M8 7H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/><rect x="8" y="3" width="13" height="13" rx="2"/></svg>전년도 같은 학기 일정 가져오기</button>
+        <p class="hint" style="margin:0 0 10px">작년 개강일 기준 <b>같은 주차·요일</b> 패턴으로 초안을 만들어 줍니다. 가져온 뒤 개별 수정·삭제하면 됩니다.</p>
+        <div class="itemlist" id="userList"></div>
+      </div>
+    </section>
+  </aside>
+
+  <!-- MAIN -->
+  <main>
+    <div class="maintop">
+      <div class="summary" id="summary"></div>
+      <div id="weekcheck"></div>
+
+      <div class="viewtabs no-print">
+        <button data-view="table" class="on"><svg class="icon" viewBox="0 0 24 24"><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>수업일수표</button>
+        <button data-view="cal"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>학사 월력</button>
+      </div>
+    </div>
+
+    <div id="viewTable"></div>
+    <div id="viewCal" style="display:none"></div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   1. 한국 공휴일 엔진 (오프라인 내장)  — 음력 기준일 + 대체공휴일 규칙
+   ============================================================ */
+const LUNAR = {
+  2025:{seollal:'2025-01-29',buddha:'2025-05-05',chuseok:'2025-10-06'},
+  2026:{seollal:'2026-02-17',buddha:'2026-05-24',chuseok:'2026-09-25'},
+  2027:{seollal:'2027-02-07',buddha:'2027-05-13',chuseok:'2027-09-15'},
+  2028:{seollal:'2028-01-27',buddha:'2028-05-02',chuseok:'2028-10-03'},
+  2029:{seollal:'2029-02-13',buddha:'2029-05-20',chuseok:'2029-09-22'},
+  2030:{seollal:'2030-02-03',buddha:'2030-05-09',chuseok:'2030-09-12'},
+};
+const EXTRA = {            // 임시공휴일·선거 등 (대체공휴일 대상 아님)
+  2025:[['2025-01-27','임시공휴일'],['2025-06-03','대통령선거']],
+  2026:[['2026-06-03','지방선거']],
+};
+const FIXED = [ // [월,일,명칭,대체공휴일대상]
+  [1,1,'신정',false],[3,1,'삼일절',true],[5,5,'어린이날',true],
+  [6,6,'현충일',false],[8,15,'광복절',true],[10,3,'개천절',true],
+  [10,9,'한글날',true],[12,25,'성탄절',true],
+];
+const YEARS = [2025,2026,2027,2028,2029,2030];
+
+/* ---- 날짜 유틸 (로컬 기준, TZ 안전) ---- */
+const pad=n=>String(n).padStart(2,'0');
+const toISO=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fromISO=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x;};
+const shortMD=d=>`${d.getMonth()+1}/${d.getDate()}`;
+const WKShort=['일','월','화','수','목','금','토'];
+
+function buildHolidays(year){
+  const base={};                 // iso -> [{name,elig,block}]
+  const addB=(iso,name,elig,block=null)=>{(base[iso]=base[iso]||[]).push({name,elig,block});};
+  FIXED.forEach(([m,d,name,elig])=>addB(`${year}-${pad(m)}-${pad(d)}`,name,elig));
+  const L=LUNAR[year];
+  if(L){
+    const s=fromISO(L.seollal);
+    [[-1,'설날연휴'],[0,'설날'],[1,'설날연휴']].forEach(([o,n])=>addB(toISO(addDays(s,o)),n,true,'seollal'));
+    const c=fromISO(L.chuseok);
+    [[-1,'추석연휴'],[0,'추석'],[1,'추석연휴']].forEach(([o,n])=>addB(toISO(addDays(c,o)),n,true,'chuseok'));
+    addB(L.buddha,'부처님오신날',true);
+  }
+  (EXTRA[year]||[]).forEach(([iso,name])=>addB(iso,name,false));
+
+  const holiset=new Set(Object.keys(base));
+  const subs={};                 // iso -> name
+  const nextFree=iso=>{
+    let d=addDays(fromISO(iso),1);
+    while(d.getDay()===0||d.getDay()===6||holiset.has(toISO(d))||subs[toISO(d)]) d=addDays(d,1);
+    return toISO(d);
+  };
+  // 설날/추석 블록: 일요일 포함 또는 다른 공휴일 겹침 시 1일 대체
+  ['seollal','chuseok'].forEach(block=>{
+    const days=Object.keys(base).filter(iso=>base[iso].some(x=>x.block===block)).sort();
+    if(!days.length)return;
+    const hasSun=days.some(iso=>fromISO(iso).getDay()===0);
+    const overlap=days.some(iso=>base[iso].length>1);
+    if(hasSun||overlap){const sd=nextFree(days[days.length-1]);subs[sd]='대체공휴일';}
+  });
+  // 단일 공휴일: 토/일 또는 겹침 시 대체
+  Object.keys(base).sort().forEach(iso=>{
+    const lst=base[iso];
+    if(lst.some(x=>x.block))return;
+    if(!lst.some(x=>x.elig))return;
+    const wd=fromISO(iso).getDay();
+    if(wd===0||wd===6||lst.length>1){const sd=nextFree(iso);subs[sd]='대체공휴일';}
+  });
+
+  const out=[];
+  Object.keys(base).forEach(iso=>{
+    const names=base[iso].map(x=>x.name);
+    out.push({iso,name:names.join('·'),kind:'law'});
+  });
+  Object.keys(subs).forEach(iso=>out.push({iso,name:subs[iso],kind:'sub'}));
+  out.sort((a,b)=>a.iso<b.iso?-1:1);
+  return out;
+}
+
+/* ============================================================
+   2. 상태
+   ============================================================ */
+const state={
+  year:2026, sem:1,
+  terms:{},                 // 'year-sem' -> {start,end}
+  overrides:{},             // iso -> {off:bool, hidden:bool}   (자동 공휴일 토글)
+  user:{},                  // 'year-sem' -> [{id,iso,name,kind}]  kind: off|exam|event
+  addKind:'off',
+  view:'table',
+  targetWeeks:15,           // 휴일 제외 목표 수업 주차 (요일별)
+  uid:1,
+};
+
+/* ===== 자동 저장 (브라우저 localStorage, 백엔드 불필요) ===== */
+const LS_KEY='academic_calendar_gen_v1';
+function saveState(){
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify({
+      year:state.year, sem:state.sem, terms:state.terms,
+      overrides:state.overrides, user:state.user,
+      targetWeeks:state.targetWeeks, uid:state.uid
+    }));
+  }catch(e){}
+}
+function loadState(){
+  try{
+    const raw=localStorage.getItem(LS_KEY); if(!raw)return;
+    const d=JSON.parse(raw);
+    ['year','sem','terms','overrides','user','targetWeeks','uid'].forEach(k=>{ if(d[k]!==undefined)state[k]=d[k]; });
+  }catch(e){}
+}
+
+function defaultTerm(year,sem){
+  if(year===2026&&sem===1)return{start:'2026-03-03',end:'2026-06-22'};
+  if(year===2026&&sem===2)return{start:'2026-08-31',end:'2026-12-18'};
+  const firstMon=(y,m,d)=>{let x=new Date(y,m-1,d);while(x.getDay()!==1)x=addDays(x,1);return x;};
+  if(sem===1){const s=firstMon(year,3,2);return{start:toISO(s),end:toISO(addDays(s,16*7-4))};}
+  const s=firstMon(year,9,1);return{start:toISO(s),end:toISO(addDays(s,16*7-4))};
+}
+const termKey=()=>`${state.year}-${state.sem}`;
+function curTerm(){const k=termKey();if(!state.terms[k])state.terms[k]=defaultTerm(state.year,state.sem);return state.terms[k];}
+function curUser(){const k=termKey();if(!state.user[k])state.user[k]=[];return state.user[k];}
+
+/* ============================================================
+   3. 계산
+   ============================================================ */
+function compute(){ return computeFor(state.year, state.sem); }
+function computeFor(year, sem){
+  const key=`${year}-${sem}`;
+  if(!state.terms[key])state.terms[key]=defaultTerm(year,sem);
+  const t=state.terms[key];
+  const start=fromISO(t.start), end=fromISO(t.end);
+  const valid=start<=end;
+  const holidays=[...buildHolidays(year),...buildHolidays(year+1)];
+  // 학기 기간 내 자동 공휴일
+  const inRangeHol=holidays.filter(h=>h.iso>=t.start&&h.iso<=t.end);
+
+  // 효과 일정(날짜->정보) : off=수업일수 제외
+  const effMap={}; // iso -> {names:[], off:bool, kinds:Set, items:[{name,kind}]}
+  const push=(iso,name,off,kind)=>{
+    if(!effMap[iso])effMap[iso]={names:[],off:false,kinds:new Set(),items:[]};
+    effMap[iso].names.push(name); effMap[iso].kinds.add(kind); effMap[iso].items.push({name,kind});
+    if(off)effMap[iso].off=true;
+  };
+  inRangeHol.forEach(h=>{
+    const ov=state.overrides[h.iso]||{};
+    if(ov.hidden)return;
+    const off = ov.off!==undefined ? ov.off : true;   // 기본 제외
+    push(h.iso,h.name,off,'hol');
+  });
+  (state.user[key]||[]).forEach(u=>{
+    for(let d=fromISO(u.iso); d<=fromISO(u.end||u.iso); d=addDays(d,1)){
+      const iso=toISO(d);
+      if(iso<t.start||iso>t.end)continue;
+      push(iso,u.name,u.kind==='off',u.kind);
+    }
+  });
+
+  // 요일별 열 (월~금)
+  const cols=[[],[],[],[],[]];
+  for(let d=new Date(start);d<=end;d=addDays(d,1)){
+    const wd=d.getDay();
+    if(wd>=1&&wd<=5)cols[wd-1].push(new Date(d));
+  }
+  const rows=Math.max(...cols.map(c=>c.length),0);
+
+  // 수업일(연대순) = 평일 - 휴업일
+  const classDays=[];
+  for(let d=new Date(start);d<=end;d=addDays(d,1)){
+    const wd=d.getDay();
+    if(wd>=1&&wd<=5&&!(effMap[toISO(d)]&&effMap[toISO(d)].off))classDays.push(new Date(d));
+  }
+  const total=classDays.length;
+  const quarters={}; // iso -> '1/4'..
+  [1,2,3].forEach(k=>{
+    if(total>0){const idx=Math.ceil(total*k/4)-1;if(idx>=0&&idx<total)quarters[toISO(classDays[idx])]=`${k}/4`;}
+  });
+  const endISO = total>0 ? toISO(classDays[total-1]) : null;
+
+  // 요일별 실제 수업일수(휴업일 제외) / 전체 칸수
+  const wdClass=[0,0,0,0,0], wdTotal=[0,0,0,0,0];
+  cols.forEach((arr,c)=>{
+    wdTotal[c]=arr.length;
+    wdClass[c]=arr.filter(d=>!(effMap[toISO(d)]&&effMap[toISO(d)].off)).length;
+  });
+
+  return {start,end,valid,cols,rows,effMap,classDays,total,quarters,endISO,inRangeHol,holidays,wdClass,wdTotal};
+}
+
+/* ============================================================
+   4. 렌더링
+   ============================================================ */
+const $=s=>document.querySelector(s);
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),1800);}
+
+function renderControls(){
+  const y=$('#year');
+  if(!y.options.length){YEARS.forEach(yr=>{const o=document.createElement('option');o.value=yr;o.textContent=yr+'학년도';y.appendChild(o);});}
+  y.value=state.year;
+  document.querySelectorAll('#semSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.sem===state.sem));
+  const t=curTerm(); $('#start').value=t.start; $('#end').value=t.end;
+  const tg=$('#target'); if(tg)tg.value=state.targetWeeks;
+}
+
+function renderSidebar(data){
+  // 공휴일 자동 리스트
+  const hl=$('#holList'); hl.innerHTML='';
+  $('#holCount').textContent=data.inRangeHol.length;
+  if(!data.inRangeHol.length)hl.innerHTML='<div class="empty">이 학기 기간에 공휴일이 없습니다</div>';
+  data.inRangeHol.forEach(h=>{
+    const ov=state.overrides[h.iso]||{};
+    if(ov.hidden)return;
+    const off = ov.off!==undefined ? ov.off : true;
+    const d=fromISO(h.iso);
+    const el=document.createElement('div');el.className='item';
+    el.innerHTML=`
+      <span class="dot" style="background:${h.kind==='sub'?'#d99227':'#c0473f'}"></span>
+      <div class="meta"><div class="nm">${h.name}</div>
+        <div class="dt">${shortMD(d)} (${WKShort[d.getDay()]})</div></div>
+      <span class="tag ${h.kind==='sub'?'sub':'law'}">${h.kind==='sub'?'대체':'법정'}</span>
+      <div class="toggle ${off?'on':''}" title="수업일수 제외" data-iso="${h.iso}"></div>`;
+    hl.appendChild(el);
+  });
+  hl.querySelectorAll('.toggle').forEach(tg=>tg.onclick=()=>{
+    const iso=tg.dataset.iso; const ov=state.overrides[iso]||{};
+    const cur = ov.off!==undefined ? ov.off : true;
+    state.overrides[iso]={...ov,off:!cur}; render();
+  });
+
+  // 사용자 추가 리스트
+  const ul=$('#userList'); ul.innerHTML='';
+  const users=curUser().slice().sort((a,b)=>a.iso<b.iso?-1:1);
+  $('#userCount').textContent=users.length;
+  if(!users.length)ul.innerHTML='<div class="empty">추가한 일정이 없습니다</div>';
+  const kindInfo={off:['off','휴업'],exam:['exam','시험'],event:['event','행사'],makeup:['makeup','보강'],admin:['admin','학사']};
+  const kindDot={off:'#E51400',exam:'#0b6e8f',event:'#b9690f',makeup:'#68217A',admin:'#44546a'};
+  users.forEach(u=>{
+    const d=fromISO(u.iso);const[cls,lbl]=kindInfo[u.kind]||['event','일정'];
+    const dtTxt=(u.end&&u.end!==u.iso)?`${shortMD(d)} ~ ${shortMD(fromISO(u.end))}`:`${shortMD(d)} (${WKShort[d.getDay()]})`;
+    const el=document.createElement('div');el.className='item';
+    el.innerHTML=`
+      <span class="dot" style="background:${kindDot[u.kind]||'#0072C6'}"></span>
+      <div class="meta"><div class="nm">${u.name||'(무제)'}</div>
+        <div class="dt">${dtTxt}</div></div>
+      <span class="tag ${cls}">${lbl}</span>
+      <div class="x" data-id="${u.id}" title="삭제"><svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></div>`;
+    ul.appendChild(el);
+  });
+  ul.querySelectorAll('.x').forEach(x=>x.onclick=()=>{
+    const id=+x.dataset.id;const k=termKey();
+    state.user[k]=state.user[k].filter(u=>u.id!==id);render();
+  });
+}
+
+function renderSummary(data){
+  const q={}; Object.keys(data.quarters).forEach(iso=>q[data.quarters[iso]]=shortMD(fromISO(iso)));
+  const s=$('#summary');
+  const cell=(k,v,icon,hl)=>`<div class="stat ${hl?'hl':''}"><div class="k">${icon}${k}</div><div class="v">${v}</div></div>`;
+  const I={
+    days:'<svg class="icon" viewBox="0 0 24 24"><path d="M3 9h18M8 2.5v4M16 2.5v4"/><rect x="3" y="4.5" width="18" height="16" rx="2.5"/></svg>',
+    wk:'<svg class="icon" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+    q:'<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 12V3a9 9 0 0 1 9 9z"/></svg>',
+    end:'<svg class="icon" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>',
+  };
+  s.innerHTML=
+    cell('총 수업일수',`${data.total}<small>일</small>`,I.days,true)+
+    cell('주차',`${data.rows}<small>주</small>`,I.wk)+
+    cell('수업일수 1/4',q['1/4']||'–',I.q)+
+    cell('수업일수 2/4',q['2/4']||'–',I.q)+
+    cell('수업일수 3/4',q['3/4']||'–',I.q)+
+    cell('종강(4/4)',data.endISO?shortMD(fromISO(data.endISO)):'–',I.end);
+}
+
+const WD5=['월','화','수','목','금'];
+// 요일별 목표 주차 점검 : 부족(short)은 실제 문제, 초과(over)는 한쪽 맞추느라 생기는 정상 케이스
+function weekIssues(data){
+  const target=state.targetWeeks, short=[], over=[];
+  data.wdClass.forEach((n,i)=>{
+    if(n<target)short.push({wd:WD5[i],diff:target-n,n});
+    else if(n>target)over.push({wd:WD5[i],diff:n-target,n});
+  });
+  return {short,over};
+}
+function renderWeekCheck(data){
+  const el=$('#weekcheck'); if(!el)return;
+  const target=state.targetWeeks;
+  const {short,over}=weekIssues(data);
+  const chips=data.wdClass.map((n,i)=>{
+    let cls='good',mark='✓';
+    if(n<target){cls='bad';mark='▼';}
+    else if(n>target){cls='over';mark='▲';}
+    return `<span class="wdchip ${cls}">${WD5[i]} ${n}/${target} ${mark}</span>`;
+  }).join('');
+  const WARN='<svg class="icon" viewBox="0 0 24 24"><path d="M12 3l9.5 16.5H2.5L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>';
+  const OK='<svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.2 2.2 4.8-5"/></svg>';
+  if(short.length){          // 부족 → 빨간 경고
+    el.className='warn';
+    const txt=short.map(o=>`${o.wd}요일 ${o.diff}일 부족`).join(' · ');
+    el.innerHTML=`<div class="hd">${WARN} 수업일수 부족 — 목표 ${target}주에 못 미칩니다</div>`+
+      `<div class="wdchips">${chips}</div>`+
+      `<div class="msg">${txt} &nbsp;→&nbsp; 개강·종강일을 조정하거나 휴업일을 줄여 ${target}주(일)를 채우세요.</div>`;
+  }else if(over.length){     // 초과만 → 정상(다른 요일 맞춤용), 차분한 안내
+    el.className='over';
+    const txt=over.map(o=>`${o.wd}요일 +${o.diff}일`).join(' · ');
+    el.innerHTML=`<div class="hd">${OK} 수업일수 점검 — 부족한 요일 없음 (목표 ${target}주 충족)</div>`+
+      `<div class="wdchips">${chips}</div>`+
+      `<div class="msg">${txt} : 다른 요일 수를 맞추기 위한 정상 범위입니다. 정확히 ${target}주로만 맞추려면 해당 요일에 휴업일을 지정하세요.</div>`;
+  }else{                     // 전부 일치 → 초록
+    el.className='ok';
+    el.innerHTML=`<div class="hd">${OK} 수업일수 점검 — 모든 요일이 정확히 ${target}주로 구성되었습니다</div>`+
+      `<div class="wdchips">${chips}</div>`;
+  }
+}
+// 날짜·목표 변경 시 경고창 (부족할 때만 — 초과는 정상이라 알리지 않음)
+function checkAndAlert(){
+  const d=window._data; if(!d||!d.valid)return;
+  const {short}=weekIssues(d);
+  if(short.length){
+    const lines=short.map(o=>`· ${o.wd}요일 : ${o.n}일 (목표 ${state.targetWeeks}일, ${o.diff}일 부족)`).join('\n');
+    alert(`[수업일수 ${state.targetWeeks}주 부족 경고]\n\n`+lines+`\n\n→ 개강·종강일을 조정하거나 휴업일을 줄이세요.`);
+  }
+}
+
+function buildTableHTML(data,sem){
+  const t={start:toISO(data.start),end:toISO(data.end)};
+  const hdW=['월','화','수','목','금'];
+  let body='';
+  for(let r=0;r<data.rows;r++){
+    let tds=`<td class="wk">${r+1}</td>`;
+    let notes=[]; // 비고
+    for(let c=0;c<5;c++){
+      const d=data.cols[c][r];
+      if(!d){tds+='<td class="day"></td>';continue;}
+      const iso=toISO(d); const eff=data.effMap[iso];
+      const isOff=eff&&eff.off;
+      const isExam=eff&&!isOff&&eff.kinds&&eff.kinds.has('exam');
+      const isMakeup=eff&&!isOff&&eff.kinds&&eff.kinds.has('makeup');
+      const isStart=iso===t.start; const isEnd=iso===data.endISO;
+      let cls='day';
+      if(isOff)cls+=' off';
+      else if(isExam)cls+=' exam';
+      else if(isMakeup)cls+=' makeup';
+      if(isStart)cls+=' mark';
+      if(isEnd)cls+=' mark end';
+      let inner=`<span class="d">${shortMD(d)}</span>`;
+      if(isOff){
+        const offName=eff.names[0]||'';
+        inner=`<span class="d">${shortMD(d)}</span><span class="oname">${offName}</span>`;
+      }
+      if(isExam||isMakeup){
+        const enames=[...new Set(eff.items.filter(x=>x.kind==='exam'||x.kind==='makeup').map(x=>x.name))].join('·');
+        inner+=`<span class="ename">${enames}</span>`;
+      }
+      if(isStart)inner+=`<div class="badge">개강</div>`;
+      if(isEnd)inner+=`<div class="badge">종강</div>`;
+      tds+=`<td class="${cls}">${inner}</td>`;
+      // 비고 : 휴업일(빨간 칸) + 시험(청록) + 보강(보라) + 개강·종강. 행사·학사는 수업일수표 미표시.
+      if(isExam||isMakeup)eff.items.forEach(it=>{
+        if(it.kind==='exam')notes.push({t:it.name,c:'exam'});
+        else if(it.kind==='makeup')notes.push({t:it.name,c:'mk'});
+      });
+      if(isStart)notes.push({t:`${sem}학기 개강`,c:'q'});
+      if(isEnd)notes.push({t:`${sem}학기 종강`,c:'q'});
+    }
+    // dedup 비고
+    const seen=new Set();const chips=notes.filter(n=>{const k=n.t;if(seen.has(k))return false;seen.add(k);return true;})
+      .map(n=>`<span class="chip ${n.c}">${n.t}</span>`).join('');
+    body+=`<tr>${tds}<td class="bigo">${chips}</td></tr>`;
+  }
+  // 헤더
+  const head=`<tr><th>주차</th>${hdW.map(w=>`<th>${w}</th>`).join('')}<th>비고</th></tr>`;
+
+  // 요일별 휴일 요약 (이미지2 형식)
+  const offByCol=[[],[],[],[],[]];
+  Object.keys(data.effMap).forEach(iso=>{
+    if(!data.effMap[iso].off)return;
+    const d=fromISO(iso);const wd=d.getDay();
+    if(wd>=1&&wd<=5)offByCol[wd-1].push({d,names:data.effMap[iso].names});
+  });
+  offByCol.forEach(c=>c.sort((a,b)=>a.d-b.d));
+  const maxOff=Math.max(...offByCol.map(c=>c.length),0);
+  // 비고 : 직접 추가한 시험·행사 (기간 내)
+  const noteItems=[];  // 수업일수표에는 시험·행사 미표시 (휴업일만)
+  let hsRows='';
+  for(let r=0;r<maxOff;r++){
+    let cells='';
+    for(let c=0;c<5;c++){
+      const o=offByCol[c][r];
+      cells+= o?`<td><span class="hday">${shortMD(o.d)}(${WKShort[o.d.getDay()]})</span><span class="hname">${o.names.join(', ')}</span></td>`:'<td></td>';
+    }
+    if(r===0)hsRows+=`<tr><td class="lab" rowspan="${maxOff}">휴일</td>${cells}<td class="note" rowspan="${maxOff}">${noteItems.join('<br>')}</td></tr>`;
+    else hsRows+=`<tr>${cells}</tr>`;
+  }
+  const hsnote=`* 수업일수(${data.total}일): 1/4(${Math.ceil(data.total/4)}일), 2/4(${Math.ceil(data.total*2/4)}일), 3/4(${Math.ceil(data.total*3/4)}일)`;
+  const holsum = maxOff? `
+    <div class="holsum">
+      <div class="ttl">학기 중 휴일 안내</div>
+      <table class="hs">
+        <thead><tr><th>구분</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th><th>비고</th></tr></thead>
+        <tbody>${hsRows}</tbody>
+      </table>
+      <div class="hsnote">${hsnote}</div>
+    </div>`:'';
+
+  const q={};Object.keys(data.quarters).forEach(iso=>q[data.quarters[iso]]=shortMD(fromISO(iso)));
+  const footer=`<div class="tfoot">
+    <span>총 <b>${data.total}일</b></span>
+    <span class="q">1/4 ${q['1/4']||'–'} (${Math.ceil(data.total/4)}일)</span>
+    <span class="q">2/4 ${q['2/4']||'–'} (${Math.ceil(data.total*2/4)}일)</span>
+    <span class="q">3/4 ${q['3/4']||'–'} (${Math.ceil(data.total*3/4)}일)</span>
+    <span class="q">종강 ${data.endISO?shortMD(fromISO(data.endISO)):'–'} (${data.total}일)</span>
+  </div>`;
+
+  return `
+    <div class="tablewrap${data.rows>=17?' compact':''}">
+      <div class="ttitle">
+        <svg class="icon" style="font-size:18px;color:var(--accent)" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+        <div><h3>${state.year}학년도 ${sem}학기 수업일수 (출석부 작성용 · 요일기준)</h3>
+        <div class="sub">${t.start.replace(/-/g,'.')} ~ ${t.end.replace(/-/g,'.')} &nbsp;·&nbsp; 수정본 9/11-O</div></div>
+      </div>
+      <table class="weeks"><thead>${head}</thead><tbody>${body}</tbody></table>
+      ${footer}
+    </div>
+    ${holsum}`;
+}
+
+/* 학기별 개강·종강 계산 (달력용: 두 학기 모두 표시, 현재 학기는 표 계산값과 동일) */
+function semRange(year,sem){
+  const k=`${year}-${sem}`;
+  const t=state.terms[k]||defaultTerm(year,sem);
+  const offSet=new Set();
+  [...buildHolidays(year),...buildHolidays(year+1)].forEach(h=>{
+    if(h.iso<t.start||h.iso>t.end)return;
+    const ov=state.overrides[h.iso]||{};
+    if(ov.hidden)return;
+    if(ov.off!==undefined?ov.off:true)offSet.add(h.iso);
+  });
+  (state.user[k]||[]).forEach(u=>{
+    if(u.kind!=='off')return;
+    for(let d=fromISO(u.iso);d<=fromISO(u.end||u.iso);d=addDays(d,1))offSet.add(toISO(d));
+  });
+  const classDays=[];
+  for(let d=fromISO(t.start);d<=fromISO(t.end);d=addDays(d,1)){
+    const wd=d.getDay();
+    if(wd>=1&&wd<=5&&!offSet.has(toISO(d)))classDays.push(toISO(d));
+  }
+  const total=classDays.length;
+  const quarters={};   // iso -> '1/4'|'2/4'|'3/4' (수업일수 분기점)
+  [1,2,3].forEach(k=>{
+    if(total>0){const idx=Math.ceil(total*k/4)-1;if(idx>=0&&idx<total)quarters[classDays[idx]]=`${k}/4`;}
+  });
+  return {start:t.start,end:total?classDays[total-1]:null,quarters,total};
+}
+
+function calData(){
+  const y=state.year;
+  // 학기 구분 없이 연간 12개월 : 3월 ~ 익년 2월
+  const monthsList=[[y,2],[y,3],[y,4],[y,5],[y,6],[y,7],[y,8],[y,9],[y,10],[y,11],[y+1,0],[y+1,1]];
+  // 1·2학기에 입력한 사용자 일정 모두 표시
+  const yearUsers=[...(state.user[`${y}-1`]||[]),...(state.user[`${y}-2`]||[])];
+
+  // 날짜별 표시(공휴일 + 사용자 일정, 기간 펼침) — kinds: hol/off/exam/event
+  const evMap={};
+  [...buildHolidays(y),...buildHolidays(y+1)].forEach(h=>{
+    const e=evMap[h.iso]=evMap[h.iso]||{names:[],kinds:new Set()};
+    e.kinds.add('hol'); e.names.push(h.name);
+  });
+  yearUsers.forEach(u=>{
+    // 학사(admin)는 색칠 없이 시작일에만 "이름(~종료)" 텍스트로 표시 — 달력 어수선함 방지
+    if(u.kind==='admin'){
+      const e=evMap[u.iso]=evMap[u.iso]||{names:[],kinds:new Set()};
+      e.kinds.add('admin');
+      let nm=u.name;
+      if(u.end&&u.end!==u.iso){
+        const sd=fromISO(u.iso), ed=fromISO(u.end);
+        const sameM=sd.getFullYear()===ed.getFullYear()&&sd.getMonth()===ed.getMonth();
+        nm+=`(~${sameM?ed.getDate():(ed.getMonth()+1)+'/'+ed.getDate()})`;
+      }
+      e.adm=e.adm||[];                       // 학사 이름은 별도 보관 (인쇄에서는 칸 표시 생략)
+      if(!e.adm.includes(nm))e.adm.push(nm);
+      return;
+    }
+    for(let d=fromISO(u.iso); d<=fromISO(u.end||u.iso); d=addDays(d,1)){
+      const iso=toISO(d), e=evMap[iso]=evMap[iso]||{names:[],kinds:new Set()};
+      e.kinds.add(u.kind);   // off / exam / event (색칠은 기간 전체)
+      // 기간 일정 이름은 시작일·주 첫날(일요일)·월 첫날에만 표기 — 매일 반복 방지
+      const showName = iso===u.iso || d.getDay()===0 || d.getDate()===1;
+      if(showName && !e.names.includes(u.name))e.names.push(u.name);
+    }
+  });
+  // 두 학기 개강·종강 표시
+  const termItems=[]; const termLbl={};
+  [1,2].forEach(sem=>{
+    const r=semRange(y,sem);
+    [[r.start,`${sem}학기 개강`,'개강'],[r.end,`${sem}학기 종강`,'종강']].forEach(([iso,name,short])=>{
+      if(!iso)return;
+      termItems.push({s:iso,e:iso,name,type:'term'});
+      termLbl[iso]=termLbl[iso]?termLbl[iso]+'·'+short:short;
+    });
+    // 수업일수 1/4·2/4·3/4 분기점 자동 표시
+    Object.keys(r.quarters).forEach(iso=>{
+      const q=r.quarters[iso], k=+q[0];
+      termItems.push({s:iso,e:iso,name:`${sem}학기 수업 ${q} (${Math.ceil(r.total*k/4)}일)`,type:'term'});
+      termLbl[iso]=termLbl[iso]?termLbl[iso]+'·수업 '+q:'수업 '+q;
+    });
+  });
+
+  // 학사일정 항목(목록용): 공휴일 단일 + 사용자 기간 + 개강/종강
+  const spanStart=new Date(monthsList[0][0],monthsList[0][1],1);
+  const lm=monthsList[monthsList.length-1];
+  const spanEnd=new Date(lm[0],lm[1]+1,0);
+  const items=[];
+  [...buildHolidays(y),...buildHolidays(y+1)].forEach(h=>{const d=fromISO(h.iso);if(d>=spanStart&&d<=spanEnd)items.push({s:h.iso,e:h.iso,name:h.name,type:'hol'});});
+  yearUsers.forEach(u=>{const d=fromISO(u.iso);if(d>=spanStart&&d<=spanEnd)items.push({s:u.iso,e:u.end||u.iso,name:u.name,type:u.kind});});
+  termItems.forEach(it=>{const d=fromISO(it.s);if(d>=spanStart&&d<=spanEnd)items.push(it);});
+  items.sort((a,b)=>a.s<b.s?-1:(a.s>b.s?1:0));
+  return {y,monthsList,evMap,termLbl,items};
+}
+const cls3=tp=>({hol:'hol',off:'hol',exam:'exam',event:'event',term:'term',makeup:'mk',admin:'adm'}[tp]||'');
+const dlabel=(s,e)=>{const ds=fromISO(s);return (e&&e!==s)?`${shortMD(ds)}~${shortMD(fromISO(e))}`:`${shortMD(ds)}(${WKShort[ds.getDay()]})`;};
+
+function renderCalendar(){
+  const {y,monthsList,evMap,termLbl,items}=calData();
+  const wk=['일','월','화','수','목','금','토'];
+  let html=`<div class="calhead"><h2>${y}학년도 학사일정 (${y}. 3. ~ ${y+1}. 2.)</h2></div>`;
+  html+='<div class="legend no-print">'+
+    '<span><i style="background:var(--off-bg);border-color:#e7a6a2"></i>공휴일·휴업일</span>'+
+    '<span><i style="background:var(--mark-bg);border-color:var(--mark-line)"></i>개강·종강</span>'+
+    '<span><i style="background:var(--exam-bg);border-color:var(--exam-text)"></i>시험</span>'+
+    '<span><i style="background:#efe3f8;border-color:#68217A"></i>보강</span>'+
+    '<span><i style="background:var(--event-bg);border-color:var(--event-text)"></i>행사</span>'+
+    '<span><i style="background:#fff;border-color:#44546a"></i>학사(텍스트만)</span></div>';
+  html+='<div class="months">';
+  monthsList.forEach(([yy,mm])=>{
+    const first=new Date(yy,mm,1),dim=new Date(yy,mm+1,0).getDate();
+    let cells='';let dow=first.getDay();
+    for(let i=0;i<dow;i++)cells+='<td class="out"></td>';
+    for(let dd=1;dd<=dim;dd++){
+      const d=new Date(yy,mm,dd),iso=toISO(d),wd=d.getDay();
+      const ev=evMap[iso];
+      const tm=termLbl[iso];
+      let c=[];
+      if(wd===0)c.push('sun'); if(wd===6)c.push('sat');
+      // 셀 색: 개강/종강(초록) > 휴일·휴업(빨강) > 시험(하늘) > 행사(주황)
+      let ek=null;
+      if(ev){ if(ev.kinds.has('hol')||ev.kinds.has('off'))ek='ho'; else if(ev.kinds.has('exam'))ek='exam'; else if(ev.kinds.has('makeup'))ek='mk'; else if(ev.kinds.has('event'))ek='ev'; else if(ev.kinds.has('admin'))ek='adm'; }
+      if(tm)c.push('term');
+      else if(ek)c.push(ek);
+      let labels=[];
+      if(tm)labels.push(tm);
+      if(ev)labels.push(...ev.names);
+      let lbl=labels.map(l=>`<span class="lbl">${l}</span>`).join('');   // 일정마다 줄바꿈
+      if(ev&&ev.adm)lbl+=ev.adm.map(l=>`<span class="lbl adm-lbl">${l}</span>`).join('');   // 학사: 화면 전용(인쇄 숨김)
+      cells+=`<td class="${c.join(' ')}"><span class="n">${dd}</span>${lbl}</td>`;
+      if(wd===6&&dd<dim)cells+='</tr><tr>';
+    }
+    for(let i=new Date(yy,mm,dim).getDay()+1;i<7;i++)cells+='<td class="out"></td>'; // 월말 뒤 빈칸도 격자 유지
+    // 이 달의 주요 학사일정 (이 달에 걸쳐 있는 항목 — 월을 넘기는 기간도 이어서 표시)
+    const mStart=new Date(yy,mm,1), mEnd=new Date(yy,mm+1,0);
+    const mItems=items.filter(it=>{const s=fromISO(it.s),e2=fromISO(it.e||it.s);return s<=mEnd&&e2>=mStart;});
+    const meHtml=mItems.length
+      ? mItems.map(it=>{
+          const cont=fromISO(it.s)<mStart;   // 앞 달에서 시작해 이어지는 일정 → 인쇄에서는 시작 달에만 표시
+          return `<div class="me ${cls3(it.type)}${cont?' cont':''}"><span class="med">${dlabel(it.s,it.e)}</span><span class="men">${it.name}</span></div>`;
+        }).join('')
+      : '<div class="none">— 일정 없음 —</div>';
+    html+=`<div class="month"><div class="mh"><svg class="icon" style="font-size:14px;color:var(--accent)" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>${yy}년 ${mm+1}월</div>`+
+      `<table class="cal"><thead><tr>${wk.map((w,i)=>`<th class="${i===0?'sun':i===6?'sat':''}">${w}</th>`).join('')}</tr></thead>`+
+      `<tbody><tr>${cells}</tr></tbody></table>`+
+      `<div class="mevents">${meHtml}</div></div>`;
+  });
+  html+='</div>';
+
+  // 통합 주요 학사일정 (화면 전용; 인쇄는 달 아래 목록 사용)
+  if(items.length){
+    html+=`<div class="schedule no-print"><div class="ttl"><svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>주요 학사일정 (전체)</div><div class="list">`+
+      items.map(it=>`<div class="row ${cls3(it.type)}"><span class="dt">${dlabel(it.s,it.e)}</span><span class="nm">${it.name}</span></div>`).join('')+
+      `</div></div>`;
+  }
+  $('#viewCal').innerHTML=html;
+}
+
+function render(){
+  saveState();
+  renderControls();
+  const data=compute();
+  renderSidebar(data);
+  if(!data.valid){
+    $('#summary').innerHTML='<div class="stat" style="grid-column:1/-1;color:var(--sun)">개강일이 종강일보다 늦습니다. 날짜를 확인해 주세요.</div>';
+    $('#weekcheck').className='';$('#weekcheck').innerHTML='';
+    $('#viewTable').innerHTML='';$('#viewCal').innerHTML='';return;
+  }
+  renderSummary(data);
+  renderWeekCheck(data);
+  // 수업일수표 : 1·2학기 모두 생성 (화면=현재 학기만, 인쇄=두 학기 연속 출력)
+  const dOther=computeFor(state.year, state.sem===1?2:1);
+  const d1=state.sem===1?data:dOther, d2=state.sem===2?data:dOther;
+  const h1=d1.valid?buildTableHTML(d1,1):'', h2=d2.valid?buildTableHTML(d2,2):'';
+  $('#viewTable').innerHTML=
+    `<div class="semtbl${state.sem===1?' cur':''}">${h1}</div>`+
+    `<div class="semtbl${state.sem===2?' cur':''}${h2?' has2':''}">${h2}</div>`;
+  renderCalendar();
+  window._data=data;
+}
+
+/* ============================================================
+   5. 이벤트
+   ============================================================ */
+$('#year').onchange=e=>{state.year=+e.target.value;render();};
+document.querySelectorAll('#semSeg button').forEach(b=>b.onclick=()=>{state.sem=+b.dataset.sem;render();});
+/* ---- 날짜 자유 입력 파서 : 3/3 · 0303 · 20260303 · 2026-03-03 · 2026.3.3 · 2026년 3월 3일 ---- */
+function parseDateInput(v){
+  if(!v)return null;
+  v=String(v).trim().replace(/일/g,'').replace(/[.\/년월]/g,'-').replace(/\s+/g,'').replace(/-+/g,'-').replace(/^-|-$/g,'');
+  let y,m,d;
+  if(/^\d{8}$/.test(v)){y=+v.slice(0,4);m=+v.slice(4,6);d=+v.slice(6,8);}
+  else if(/^\d{4}$/.test(v)){m=+v.slice(0,2);d=+v.slice(2,4);}
+  else{
+    const p=v.split('-').filter(Boolean).map(Number);
+    if(p.some(isNaN)||p.length<2||p.length>3)return null;
+    if(p.length===3){y=p[0];m=p[1];d=p[2];}else{m=p[0];d=p[1];}
+  }
+  if(y===undefined){y=state.year;if(m<=2)y=state.year+1;}   // 연도 생략 시 학년도 기준(1·2월=익년)
+  if(y<100)y+=2000;
+  if(m<1||m>12||d<1||d>31)return null;
+  const dt=new Date(y,m-1,d);
+  if(dt.getFullYear()!==y||dt.getMonth()!==m-1||dt.getDate()!==d)return null;
+  return toISO(dt);
+}
+/* 달력 버튼 + Enter 확정 연결 */
+function wireDatePickers(){
+  document.querySelectorAll('.dwrap').forEach(w=>{
+    const txt=w.querySelector('input[type=text]'),pick=w.querySelector('.dpick'),nat=w.querySelector('.dnative');
+    if(!txt||!pick||!nat)return;
+    txt.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();txt.blur();}});
+    pick.onclick=()=>{
+      nat.value=parseDateInput(txt.value)||`${state.year}-03-01`;
+      try{ nat.showPicker ? nat.showPicker() : nat.focus(); }catch(e){ nat.focus(); }
+    };
+    nat.onchange=()=>{ if(!nat.value)return; txt.value=nat.value; txt.dispatchEvent(new Event('change')); };
+  });
+}
+function bindTermDate(id,apply){
+  $('#'+id).onchange=e=>{
+    const iso=parseDateInput(e.target.value);
+    if(!iso){toast('날짜를 인식하지 못했습니다 (예: 3/3, 0303, 2026-03-03)');renderControls();return;}
+    e.target.value=iso; apply(iso);
+  };
+}
+bindTermDate('start',iso=>{curTerm().start=iso;render();checkAndAlert();});
+bindTermDate('end',iso=>{curTerm().end=iso;render();checkAndAlert();});
+$('#target').onchange=e=>{state.targetWeeks=+e.target.value;render();checkAndAlert();};
+$('#btnReset').onclick=()=>{state.terms[termKey()]=defaultTerm(state.year,state.sem);render();toast('기본값으로 되돌렸습니다');};
+$('#btnClearAll').onclick=()=>{
+  if(confirm('저장된 모든 입력(개강·종강일, 휴업일, 시험·행사, 공휴일 토글, 목표 주차)을 지우고 기본값으로 되돌릴까요?')){
+    try{localStorage.removeItem(LS_KEY);}catch(e){}
+    location.reload();
+  }
+};
+
+document.querySelectorAll('#addKind button').forEach(b=>b.onclick=()=>{
+  state.addKind=b.dataset.kind;
+  document.querySelectorAll('#addKind button').forEach(x=>x.classList.toggle('on',x===b));
+});
+$('#btnAdd').onclick=()=>{
+  let rawS=$('#addDate').value.trim(), rawE=$('#addEnd').value.trim(), name=$('#addName').value.trim();
+  if(rawS.includes('~')){const p=rawS.split('~');rawS=p[0].trim();if(!rawE)rawE=(p[1]||'').trim();}   // "4/20~4/24" 한 번에 붙여넣기 지원
+  if(!rawS){toast('시작일을 입력해 주세요');return;}
+  let iso=parseDateInput(rawS), end=rawE?parseDateInput(rawE):'';
+  if(!iso){toast('시작일을 인식하지 못했습니다 (예: 4/20, 0420, 2026-04-20)');return;}
+  if(rawE&&!end){toast('종료일을 인식하지 못했습니다');return;}
+  if(end&&end<iso){const tmp=iso;iso=end;end=tmp;}   // 시작/종료 뒤바뀌면 자동 교정
+  $('#addDate').value=iso;
+  curUser().push({id:state.uid++,iso,end:end||iso,name:name||({off:'휴업일',exam:'시험',event:'행사',makeup:'지정보강일',admin:'학사일정'})[state.addKind],kind:state.addKind});
+  $('#addName').value='';$('#addEnd').value='';
+  const t=curTerm();
+  if((end||iso)<t.start||iso>t.end)toast('추가됨 (학기 기간 밖이라 표에는 표시되지 않습니다)');
+  else toast('일정을 추가했습니다');
+  render();
+};
+
+/* 분리 인쇄 : 버튼에 따라 수업일수표 또는 학사일정 달력만 출력 */
+function printMode(mode){
+  document.body.classList.add(mode);
+  const cleanup=()=>document.body.classList.remove('print-table','print-cal');
+  window.addEventListener('afterprint',cleanup,{once:true});
+  window.print();
+  setTimeout(cleanup,1000);   // afterprint 미지원 브라우저 대비
+}
+$('#btnPrintTable').onclick=()=>printMode('print-table');
+$('#btnPrintCal').onclick=()=>printMode('print-cal');
+
+/* 전년도 같은 학기 일정 가져오기 : 개강일 기준 같은 주차·요일 패턴으로 복사 */
+$('#btnCopyPrev').onclick=()=>{
+  const prevKey=`${state.year-1}-${state.sem}`;
+  const prevItems=state.user[prevKey]||[];
+  if(!prevItems.length){toast(`${state.year-1}학년도 ${state.sem}학기에 입력된 일정이 없습니다`);return;}
+  const prevTerm=state.terms[prevKey]||defaultTerm(state.year-1,state.sem);
+  const curT=curTerm();
+  const monOf=d=>addDays(d,-((d.getDay()+6)%7));            // 그 주의 월요일
+  const oldW0=monOf(fromISO(prevTerm.start)), newW0=monOf(fromISO(curT.start));
+  const mapISO=iso=>{
+    const d=fromISO(iso);
+    const weekIdx=Math.round((monOf(d)-oldW0)/(7*86400000)); // 개강 주 기준 몇 번째 주인지
+    return toISO(addDays(newW0,weekIdx*7+((d.getDay()+6)%7)));
+  };
+  const cur=curUser();
+  const dup=(iso,name,kind)=>cur.some(u=>u.iso===iso&&u.name===name&&u.kind===kind);
+  const mapped=prevItems.map(u=>({iso:mapISO(u.iso),end:mapISO(u.end||u.iso),name:u.name,kind:u.kind}))
+                        .filter(m=>!dup(m.iso,m.name,m.kind));
+  if(!mapped.length){toast('가져올 새 일정이 없습니다 (이미 모두 있음)');return;}
+  const preview=mapped.slice(0,5).map(m=>`· ${m.name} : ${m.iso.slice(5).replace('-','/')}${m.end!==m.iso?'~'+m.end.slice(5).replace('-','/'):''}`).join('\n');
+  if(!confirm(`${state.year-1}학년도 ${state.sem}학기 일정 ${mapped.length}건을\n같은 주차·요일 패턴으로 가져올까요?\n\n${preview}${mapped.length>5?'\n· …외 '+(mapped.length-5)+'건':''}\n\n(가져온 뒤 개별 수정·삭제 가능)`))return;
+  mapped.forEach(m=>cur.push({id:state.uid++,...m}));
+  render();
+  toast(`${mapped.length}건을 가져왔습니다 — 날짜를 확인해 주세요`);
+};
+
+document.querySelectorAll('.viewtabs button').forEach(b=>b.onclick=()=>{
+  state.view=b.dataset.view;
+  document.querySelectorAll('.viewtabs button').forEach(x=>x.classList.toggle('on',x===b));
+  $('#viewTable').style.display=state.view==='table'?'':'none';
+  $('#viewCal').style.display=state.view==='cal'?'':'none';
+});
+
+/* ---- 엑셀(.xls) 내보내기 : PDF 출력물과 동일 양식 (1·2학기 수업일수표 + 휴일 안내 + 연간 학사일정) ---- */
+$('#btnXls').onclick=()=>{
+  const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const BD='border:.5pt solid #000000;';
+  const CTR='text-align:center;vertical-align:middle;';
+  const gap='<tr><td colspan="7" style="height:16px;border:none"></td></tr>';
+  let out='';
+
+  /* --- [1·2학기] 수업일수표 + 휴일 안내 --- */
+  [1,2].forEach(sem=>{
+    const d=computeFor(state.year,sem);
+    if(!d.valid)return;
+    const t=state.terms[`${state.year}-${sem}`];
+    const q={};Object.keys(d.quarters).forEach(iso=>q[d.quarters[iso]]=shortMD(fromISO(iso)));
+    out+=`<tr><td colspan="7" style="${BD}background:#0072C6;color:#ffffff;font-size:13pt;font-weight:bold;height:30px;vertical-align:middle">&nbsp;${state.year}학년도 ${sem}학기 수업일수 (출석부 작성용 · 요일기준) &nbsp;—&nbsp; ${t.start.replace(/-/g,'.')} ~ ${t.end.replace(/-/g,'.')}</td></tr>`;
+    out+=`<tr>${['주차','월','화','수','목','금','비고'].map(h=>`<td style="${BD}${CTR}background:#ffe680;font-weight:bold">${h}</td>`).join('')}</tr>`;
+    for(let r=0;r<d.rows;r++){
+      let tds=`<td style="${BD}${CTR}background:#d9ebfb;color:#00427e;font-weight:bold">${r+1}</td>`;
+      const notes=[];
+      for(let c=0;c<5;c++){
+        const dd=d.cols[c][r];
+        if(!dd){tds+=`<td style="${BD}"></td>`;continue;}
+        const iso=toISO(dd),eff=d.effMap[iso];
+        const isOff=eff&&eff.off;
+        const isExam=eff&&!isOff&&eff.kinds.has('exam');
+        const isMk=eff&&!isOff&&eff.kinds.has('makeup');
+        const isStart=iso===t.start,isEnd=iso===d.endISO;
+        let st=BD+CTR, sub='';
+        if(isOff){st+='background:#ffe1e0;color:#b30000;';sub=esc(eff.names[0]||'');}
+        else if(isExam||isMk){
+          st+=isExam?'background:#b0e0f4;':'background:#e4d4f4;';
+          sub=`<span style="color:${isExam?'#085a75':'#5e1f6e'}">${esc([...new Set(eff.items.filter(x=>x.kind==='exam'||x.kind==='makeup').map(x=>x.name))].join('·'))}</span>`;
+        }
+        if(isStart||isEnd)st+='background:#e0f3da;';
+        if(isStart)sub+=(sub?'<br>':'')+'<span style="color:#1b7a1b">[개강]</span>';
+        if(isEnd)sub+=(sub?'<br>':'')+'<span style="color:#00427e">[종강]</span>';
+        tds+=`<td style="${st}"><b>${shortMD(dd)}</b>${sub?'<br><span style="font-size:8pt;font-weight:bold">'+sub+'</span>':''}</td>`;
+        if(eff)eff.items.forEach(it=>{if(it.kind==='exam'||it.kind==='makeup')notes.push(it.name);});
+        if(isStart)notes.push(`${sem}학기 개강`);
+        if(isEnd)notes.push(`${sem}학기 종강`);
+      }
+      out+=`<tr>${tds}<td style="${BD}font-size:9pt">${esc([...new Set(notes)].join(', '))}</td></tr>`;
+    }
+    out+=`<tr><td colspan="7" style="${BD}background:#f5f5f5;font-weight:bold">&nbsp;총 ${d.total}일 &nbsp;&nbsp; <span style="color:#1b7a1b">1/4 ${q['1/4']||'–'} (${Math.ceil(d.total/4)}일) &nbsp; 2/4 ${q['2/4']||'–'} (${Math.ceil(d.total*2/4)}일) &nbsp; 3/4 ${q['3/4']||'–'} (${Math.ceil(d.total*3/4)}일) &nbsp; 종강 ${d.endISO?shortMD(fromISO(d.endISO)):'–'} (${d.total}일)</span></td></tr>`;
+    /* 학기 중 휴일 안내 */
+    const offBy=[[],[],[],[],[]];
+    Object.keys(d.effMap).forEach(iso=>{
+      if(!d.effMap[iso].off)return;
+      const dd=fromISO(iso),wd=dd.getDay();
+      if(wd>=1&&wd<=5)offBy[wd-1].push({dd,names:d.effMap[iso].names});
+    });
+    offBy.forEach(c=>c.sort((a,b)=>a.dd-b.dd));
+    const maxOff=Math.max(...offBy.map(c=>c.length),0);
+    if(maxOff){
+      out+=`<tr><td colspan="7" style="${BD}background:#0072C6;color:#ffffff;font-weight:bold">&nbsp;학기 중 휴일 안내</td></tr>`;
+      out+=`<tr>${['구분','월','화','수','목','금','비고'].map(h=>`<td style="${BD}${CTR}background:#ffe680;font-weight:bold">${h}</td>`).join('')}</tr>`;
+      for(let r2=0;r2<maxOff;r2++){
+        let cells='';
+        for(let c2=0;c2<5;c2++){
+          const o=offBy[c2][r2];
+          cells+=o?`<td style="${BD}${CTR}color:#b30000;font-weight:bold">${shortMD(o.dd)}(${WKShort[o.dd.getDay()]})<br><span style="font-size:8.5pt">${esc(o.names.join(', '))}</span></td>`:`<td style="${BD}"></td>`;
+        }
+        out+= r2===0
+          ? `<tr><td style="${BD}${CTR}background:#d9ebfb;color:#00427e;font-weight:bold" rowspan="${maxOff}">휴일</td>${cells}<td style="${BD}" rowspan="${maxOff}"></td></tr>`
+          : `<tr>${cells}</tr>`;
+      }
+      out+=`<tr><td colspan="7" style="${BD}font-size:9.5pt">&nbsp;* 수업일수(${d.total}일): 1/4(${Math.ceil(d.total/4)}일), 2/4(${Math.ceil(d.total*2/4)}일), 3/4(${Math.ceil(d.total*3/4)}일)</td></tr>`;
+    }
+    out+=gap;
+  });
+
+  /* --- 연간 학사일정 달력 (3월~익년 2월, 인쇄와 동일 규칙) --- */
+  const {y,monthsList,evMap,termLbl,items}=calData();
+  out+=`<tr><td colspan="7" style="${CTR}font-size:14pt;font-weight:bold;height:32px;border:none">${y}학년도 학사일정 (${y}. 3. ~ ${y+1}. 2.)</td></tr>`;
+  const wkN=['일','월','화','수','목','금','토'];
+  const CAT={ho:['#ffe1e0','#b30000'],term:['#e0f3da','#1b7a1b'],exam:['#d3eef8','#0b6e8f'],mk:['#ecdff7','#5e1f6e'],ev:['#ffeed7','#a35a00']};
+  monthsList.forEach(([yy,mm])=>{
+    out+=`<tr><td colspan="7" style="${BD}background:#0072C6;color:#ffffff;font-size:12pt;font-weight:bold;height:26px;vertical-align:middle">&nbsp;${yy}년 ${mm+1}월</td></tr>`;
+    out+=`<tr>${wkN.map((w,i)=>`<td style="${BD}${CTR}background:#ffe680;font-weight:bold;color:${i===0?'#c40000':i===6?'#1b6ec2':'#000000'}">${w}</td>`).join('')}</tr>`;
+    const first=new Date(yy,mm,1),dim=new Date(yy,mm+1,0).getDate();
+    const OUTBG='background:#f4f4f4;';
+    let cells='',dow=first.getDay();
+    for(let i=0;i<dow;i++)cells+=`<td style="${BD}${OUTBG}"></td>`;
+    for(let dd2=1;dd2<=dim;dd2++){
+      const dObj=new Date(yy,mm,dd2),iso=toISO(dObj),wd=dObj.getDay();
+      const ev=evMap[iso];const tm=termLbl[iso];
+      let ek=null;
+      if(ev){ if(ev.kinds.has('hol')||ev.kinds.has('off'))ek='ho'; else if(ev.kinds.has('exam'))ek='exam'; else if(ev.kinds.has('makeup'))ek='mk'; else if(ev.kinds.has('event'))ek='ev'; }
+      const cat=tm?'term':ek;
+      const bg=cat?CAT[cat][0]:'', fg=cat?CAT[cat][1]:'';
+      const nColor=cat?fg:(wd===0?'#c40000':wd===6?'#1b6ec2':(ev&&ev.kinds.has('admin')?'#6e6e6e':'#000000'));
+      const labels=[];
+      if(tm)labels.push(tm);
+      if(ev)labels.push(...ev.names);
+      const lblHtml=labels.length?`<br><span style="font-size:7.5pt;font-weight:bold;color:${fg||'#000000'}">${labels.map(esc).join('<br>')}</span>`:'';
+      cells+=`<td style="${BD}text-align:left;vertical-align:top;${bg?`background:${bg};`:''}"><b><span style="color:${nColor}">${dd2}</span></b>${lblHtml}</td>`;
+      if(wd===6&&dd2<dim)cells+='</tr><tr>';
+    }
+    for(let i=new Date(yy,mm,dim).getDay()+1;i<7;i++)cells+=`<td style="${BD}${OUTBG}"></td>`;
+    out+=`<tr>${cells}</tr>`;
+    // 이달의 주요 일정 (시작일이 이 달인 항목만 — 인쇄와 동일)
+    const mItems=items.filter(it=>{const s=fromISO(it.s);return s.getFullYear()===yy&&s.getMonth()===mm;});
+    if(mItems.length){
+      out+=`<tr><td colspan="7" style="${BD}background:#f5f5f5;font-weight:bold;font-size:9.5pt">&nbsp;이달의 주요 일정</td></tr>`;
+      mItems.forEach(it=>{
+        const col=({hol:'#b30000',term:'#1b7a1b',exam:'#0b6e8f',mk:'#5e1f6e',event:'#a35a00',adm:'#3c4a5a'})[cls3(it.type)]||'#000000';
+        out+=`<tr><td colspan="2" style="${BD}font-size:9.5pt;font-weight:bold;color:${col}">&nbsp;${dlabel(it.s,it.e)}</td><td colspan="5" style="${BD}font-size:9.5pt;font-weight:bold;color:${col}">&nbsp;${esc(it.name)}</td></tr>`;
+      });
+    }
+    out+=gap;
+  });
+
+  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8">
+    <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>${state.year}학년도 학사일정</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+    <style>br{mso-data-placement:same-cell}</style>
+    </head><body>
+    <table style="border-collapse:collapse;font-family:맑은 고딕,Malgun Gothic;font-size:10.5pt">
+      <col width="64"><col width="92"><col width="92"><col width="92"><col width="92"><col width="92"><col width="170">
+      ${out}
+    </table></body></html>`;
+  const blob=new Blob(['﻿'+html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=`${state.year}학년도_학사일정_수업일수표.xls`;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast('엑셀 파일을 저장했습니다');
+};
+
+/* ---- 뷰어(index.html) 연동 : 공유 링크 + data.json 내보내기 ---- */
+function exportViewerData(){
+  return {updated:toISO(new Date()),year:state.year,sem:state.sem,terms:state.terms,
+          overrides:state.overrides,user:state.user,targetWeeks:state.targetWeeks};
+}
+const viewerURL=()=>location.protocol==='file:'
+  ? new URL('index.html',location.href).href
+  : new URL('.',location.href).href;   // 웹 호스팅에서는 디렉터리 주소가 곧 뷰어(index.html)
+$('#btnShare').onclick=async()=>{
+  const json=JSON.stringify(exportViewerData());
+  const b64=encodeURIComponent(btoa(unescape(encodeURIComponent(json))));
+  const url=viewerURL()+'#d='+b64;
+  try{
+    await navigator.clipboard.writeText(url);
+    toast('뷰어 공유 링크를 복사했습니다 — 붙여넣어 전달하세요');
+  }catch(e){
+    prompt('아래 링크를 복사해 전달하세요 (Ctrl+C)',url);
+  }
+};
+$('#btnData').onclick=()=>{
+  const blob=new Blob([JSON.stringify(exportViewerData(),null,1)],{type:'application/json;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='data.json';a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast('data.json 저장됨 — 뷰어와 같은 폴더(저장소)에 올리면 모두에게 반영됩니다');
+};
+(()=>{const a=document.getElementById('lnkViewer');if(a)a.href=viewerURL();})();
+
+/* 고정 영역 위치: 툴바 실제 높이를 측정해 그 아래에 요약·사이드바를 붙임 */
+function setStickyTop(){
+  const tb=document.querySelector('.toolbar');
+  document.documentElement.style.setProperty('--stickytop',(tb?tb.offsetHeight:72)+'px');
+}
+window.addEventListener('resize',setStickyTop);
+
+/* 초기 렌더 */
+loadState();
+render();
+setStickyTop();
+wireDatePickers();
+</script>
+</body>
+</html>

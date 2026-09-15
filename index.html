@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>학사일정 안내</title>
+<style>
+  :root{
+    --bg:#f3f5f8; --surface:#ffffff; --line:#dde3ea; --line-strong:#aab4c0;
+    --text:#1b2330; --muted:#5b6675; --faint:#8b95a3;
+    --brand:#0b62c4; --brand-dark:#084b97; --brand-soft:#e4effc;
+    --hol:#c9302a; --hol-bg:#fdecec;
+    --term:#1e7a2a; --term-bg:#e4f4e2;
+    --exam:#0e7fa3; --exam-bg:#def0f8;
+    --event:#b06008; --event-bg:#fdf0da;
+    --mk:#7a2f96; --mk-bg:#f3e8fa;
+    --adm:#44546a;
+    --sun:#c9302a; --sat:#1b6ec2;
+    --head-bg:#ffe680;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Pretendard","Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",-apple-system,
+                BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  .icon{width:1em;height:1em;stroke:currentColor;stroke-width:1.8;fill:none;
+        stroke-linecap:round;stroke-linejoin:round;vertical-align:-.12em;flex:0 0 auto}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:30;background:var(--brand);color:#fff;
+    padding:0 max(18px,env(safe-area-inset-left));
+    display:flex;align-items:center;gap:14px;min-height:58px;flex-wrap:wrap;
+    box-shadow:0 2px 8px rgba(10,40,80,.18);
+  }
+  .topbar .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;letter-spacing:-.3px;padding:10px 0}
+  .topbar .brand .icon{font-size:22px}
+  .topbar .spacer{flex:1}
+  .tabs{display:flex;gap:4px;padding:8px 0}
+  .tabs button{
+    border:0;background:rgba(255,255,255,.14);color:#e6f0fb;cursor:pointer;
+    padding:9px 16px;border-radius:8px;font-size:14px;font-weight:700;font-family:inherit;
+    display:inline-flex;align-items:center;gap:7px;transition:background .12s;
+  }
+  .tabs button:hover{background:rgba(255,255,255,.26)}
+  .tabs button.on{background:#fff;color:var(--brand-dark)}
+  .btnprint{border:1px solid rgba(255,255,255,.5);background:transparent;color:#fff;cursor:pointer;
+    padding:8px 14px;border-radius:8px;font-size:13.5px;font-weight:700;font-family:inherit;
+    display:inline-flex;align-items:center;gap:7px}
+  .btnprint:hover{background:rgba(255,255,255,.15)}
+
+  .wrap{max-width:1200px;margin:0 auto;padding:22px 18px calc(40px + env(safe-area-inset-bottom, 0px))}
+
+  /* ---------- hero (연도 + 학기 요약) ---------- */
+  .yearnav{display:flex;align-items:center;justify-content:center;gap:12px;margin:6px 0 4px}
+  .yearnav h1{margin:0;font-size:30px;font-weight:900;letter-spacing:-.8px;text-align:center}
+  .yearnav .arrow{
+    width:40px;height:40px;border-radius:50%;border:1.5px solid var(--line-strong);background:var(--surface);
+    color:var(--brand);cursor:pointer;font-size:17px;display:flex;align-items:center;justify-content:center;
+    transition:background .12s,border-color .12s;
+  }
+  .yearnav .arrow:hover{background:var(--brand-soft);border-color:var(--brand)}
+  .yearnav .arrow:disabled{opacity:.3;cursor:default}
+  .yearnav select{
+    border:1.5px solid var(--line-strong);background:var(--surface);color:var(--text);
+    padding:8px 12px;border-radius:9px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;
+  }
+  .srcline{text-align:center;font-size:12.5px;color:var(--faint);margin-bottom:16px}
+  .srcline b{color:var(--muted)}
+
+  .semcards{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px}
+  @media (max-width:860px){.semcards{grid-template-columns:1fr}}
+  .semcard{background:var(--surface);border:1.5px solid var(--line-strong);border-radius:14px;overflow:hidden}
+  .semcard .sh{display:flex;align-items:center;gap:10px;padding:12px 18px;background:var(--brand);color:#fff}
+  .semcard .sh h2{margin:0;font-size:16px;font-weight:800}
+  .semcard .sh .period{margin-left:auto;font-size:13px;color:#d7e9fb;font-weight:600}
+  .semcard .sb{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-bottom:1px solid var(--line)}
+  .semcard .cell{padding:13px 10px;text-align:center;border-right:1px solid var(--line)}
+  .semcard .cell:last-child{border-right:0}
+  .semcard .cell .k{font-size:12px;color:var(--muted);font-weight:700}
+  .semcard .cell .v{font-size:21px;font-weight:900;letter-spacing:-.5px;margin-top:2px}
+  .semcard .cell .v small{font-size:12px;font-weight:700;color:var(--muted)}
+  .semcard .cell.start .v{color:var(--term)}
+  .semcard .cell.end .v{color:var(--brand-dark)}
+  .semcard .qline{display:flex;flex-wrap:wrap;gap:7px 14px;padding:11px 18px;font-size:13px;color:var(--muted);background:#fafbfd}
+  .semcard .qline b{color:var(--term);font-weight:800}
+
+  /* 다가오는 일정 */
+  .upcoming{background:var(--surface);border:1.5px solid var(--line-strong);border-radius:14px;
+    padding:13px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .upcoming .ut{font-size:13.5px;font-weight:800;color:var(--brand-dark);display:flex;align-items:center;gap:7px;flex:0 0 auto}
+  .upcoming .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .uchip{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:9px;
+    font-size:13px;font-weight:700;border:1.5px solid var(--line)}
+  .uchip .dd{font-size:11.5px;font-weight:900;padding:2px 7px;border-radius:6px;background:var(--brand);color:#fff}
+  .uchip.hol{background:var(--hol-bg);color:var(--hol);border-color:#f0c3c1}
+  .uchip.term{background:var(--term-bg);color:var(--term);border-color:#b9dfb4}
+  .uchip.exam{background:var(--exam-bg);color:var(--exam);border-color:#b5dcec}
+  .uchip.event{background:var(--event-bg);color:var(--event);border-color:#f0d5a8}
+  .uchip.mk{background:var(--mk-bg);color:var(--mk);border-color:#dcc3ec}
+  .uchip.adm{background:#eef1f5;color:var(--adm);border-color:#c8d0da}
+
+  /* ---------- legend ---------- */
+  .legend{display:flex;gap:14px 18px;flex-wrap:wrap;margin:0 0 14px;font-size:13px;color:var(--muted);align-items:center}
+  .legend span{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+  .legend i{width:14px;height:14px;border-radius:4px;display:inline-block;border:1.5px solid}
+
+  /* ---------- month calendar ---------- */
+  .months{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:16px}
+  @media (max-width:880px){.months{grid-template-columns:1fr}}
+  .month{background:var(--surface);border:1.5px solid var(--line-strong);border-radius:13px;overflow:hidden;
+    display:flex;flex-direction:column}
+  .month .mh{padding:10px 15px;font-weight:900;font-size:16px;background:var(--brand);color:#fff;
+    display:flex;align-items:center;gap:8px;letter-spacing:-.3px}
+  table.cal{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
+  table.cal th{padding:8px 0;font-size:12px;font-weight:800;color:var(--muted);
+    border-bottom:1.5px solid var(--line-strong);background:#fbfcfe}
+  table.cal th.sun,table.cal td.sun .n{color:var(--sun)}
+  table.cal th.sat,table.cal td.sat .n{color:var(--sat)}
+  table.cal td{height:64px;vertical-align:top;padding:5px 6px;border:1px solid var(--line)}
+  table.cal td .n{font-weight:800;font-size:13.5px}
+  table.cal td .lbl{display:block;font-size:10.5px;line-height:1.25;margin-top:2px;font-weight:700;word-break:keep-all}
+  table.cal td.ho{background:var(--hol-bg)}
+  table.cal td.ho .n,table.cal td.ho .lbl{color:var(--hol)}
+  table.cal td.term{background:var(--term-bg)}
+  table.cal td.term .n,table.cal td.term .lbl{color:var(--term)}
+  table.cal td.exam{background:var(--exam-bg)}
+  table.cal td.exam .n,table.cal td.exam .lbl{color:var(--exam)}
+  table.cal td.ev{background:var(--event-bg)}
+  table.cal td.ev .n,table.cal td.ev .lbl{color:var(--event)}
+  table.cal td.mk{background:var(--mk-bg)}
+  table.cal td.mk .n,table.cal td.mk .lbl{color:var(--mk)}
+  table.cal td .lbl.adm-lbl{color:var(--adm)}
+  table.cal td.out{background:#f6f8fa}
+  table.cal td.today{outline:2.5px solid var(--brand);outline-offset:-2.5px;border-radius:4px}
+  table.cal td.today .n::after{content:"오늘";font-size:9px;font-weight:900;color:#fff;background:var(--brand);
+    border-radius:5px;padding:1px 5px;margin-left:4px;vertical-align:1px}
+  .month .mevents{border-top:1.5px solid var(--line-strong);padding:10px 14px;background:#fbfcfe;flex:1}
+  .month .mevents .metitle{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px}
+  .month .mevents .me{display:flex;gap:10px;align-items:baseline;padding:3.5px 0 3.5px 10px;font-size:13px;
+    line-height:1.4;border-left:3.5px solid var(--line-strong)}
+  .month .mevents .me+.me{margin-top:2px}
+  .month .mevents .me .med{font-weight:800;white-space:nowrap;min-width:76px}
+  .month .mevents .me.hol{border-left-color:var(--hol)} .month .mevents .me.hol .med,.month .mevents .me.hol .men{color:var(--hol)}
+  .month .mevents .me.term{border-left-color:var(--term)} .month .mevents .me.term .med,.month .mevents .me.term .men{color:var(--term);font-weight:800}
+  .month .mevents .me.exam{border-left-color:var(--exam)} .month .mevents .me.exam .med,.month .mevents .me.exam .men{color:var(--exam)}
+  .month .mevents .me.event{border-left-color:var(--event)} .month .mevents .me.event .med,.month .mevents .me.event .men{color:var(--event)}
+  .month .mevents .me.mk{border-left-color:var(--mk)} .month .mevents .me.mk .med,.month .mevents .me.mk .men{color:var(--mk)}
+  .month .mevents .me.adm{border-left-color:var(--adm)} .month .mevents .me.adm .med,.month .mevents .me.adm .men{color:var(--adm)}
+  .month .mevents .none{font-size:12px;color:var(--faint);text-align:center;padding:6px 0}
+
+  /* ---------- 수업일수표 ---------- */
+  .semtitle{display:flex;align-items:center;gap:10px;margin:26px 0 12px;font-size:19px;font-weight:900;letter-spacing:-.4px}
+  .semtitle:first-child{margin-top:0}
+  .semtitle .bar{width:6px;height:22px;border-radius:3px;background:var(--brand)}
+  .semtitle .range{font-size:13.5px;color:var(--muted);font-weight:600}
+  .tablewrap{background:var(--surface);border:1.5px solid var(--line-strong);border-radius:13px;overflow:hidden}
+  .tscroll{overflow-x:auto}
+  table.weeks{width:100%;min-width:680px;border-collapse:collapse;font-size:14px;table-layout:fixed}
+  table.weeks th,table.weeks td{border:1px solid var(--line);padding:6px 5px;text-align:center;vertical-align:middle}
+  table.weeks thead th{background:var(--head-bg);color:#1a1a1a;font-weight:800;font-size:13.5px;padding:10px 5px}
+  table.weeks th:first-child,table.weeks td.wk{width:7%}
+  table.weeks th:last-child,table.weeks td.bigo{width:22%}
+  table.weeks td{height:52px}
+  table.weeks td.wk{background:var(--brand-soft);font-weight:900;color:var(--brand-dark)}
+  table.weeks td .d{display:block;font-size:14.5px;font-weight:700;line-height:1.2}
+  table.weeks td.off{background:var(--hol-bg)}
+  table.weeks td.off .d{color:var(--hol);font-weight:900}
+  table.weeks td.off .oname{display:block;font-size:9.5px;font-weight:800;color:var(--hol);line-height:1.1;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.weeks td.exam{background:var(--exam-bg)}
+  table.weeks td.exam .ename{display:block;font-size:9.5px;font-weight:800;color:var(--exam);line-height:1.1;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.weeks td.makeup{background:var(--mk-bg)}
+  table.weeks td.makeup .ename{display:block;font-size:9.5px;font-weight:800;color:var(--mk);line-height:1.1;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.weeks td.mark{background:var(--term-bg)}
+  table.weeks td.mark .badge{display:block;width:fit-content;margin:3px auto 0;font-size:9.5px;font-weight:900;
+    color:#fff;background:var(--term);border-radius:5px;padding:1px 7px;line-height:1.5}
+  table.weeks td.end .badge{background:var(--brand)}
+  table.weeks td.bigo{text-align:left;font-size:11px;line-height:1.3}
+  table.weeks td.bigo .chip{display:inline-block;margin:1px 3px 1px 0;font-size:10.5px;padding:1px 7px;border-radius:6px;
+    background:var(--brand-soft);color:#3c5271;font-weight:700}
+  table.weeks td.bigo .chip.exam{background:var(--exam-bg);color:var(--exam)}
+  table.weeks td.bigo .chip.mk{background:var(--mk-bg);color:var(--mk)}
+  table.weeks td.bigo .chip.q{background:var(--term-bg);color:var(--term)}
+  .tfoot{padding:12px 18px;border-top:1.5px solid var(--line-strong);background:#fbfcfe;
+    font-size:13.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 20px;align-items:center}
+  .tfoot b{color:var(--text);font-size:15px}
+  .tfoot .q{color:var(--term);font-weight:800}
+  .holsum{margin-top:12px;background:var(--surface);border:1.5px solid var(--line-strong);border-radius:13px;overflow:hidden}
+  .holsum .ttl{background:var(--brand);color:#fff;font-weight:800;padding:9px 15px;font-size:14px}
+  table.hs{width:100%;border-collapse:collapse;font-size:13px}
+  table.hs th,table.hs td{border:1px solid var(--line);padding:8px;text-align:center;vertical-align:middle}
+  table.hs th{background:var(--head-bg);color:#1a1a1a;font-weight:800}
+  table.hs td.lab{background:var(--brand-soft);color:var(--brand-dark);font-weight:900}
+  table.hs td .hday{font-weight:900;color:var(--hol)}
+  table.hs td .hname{font-size:11px;color:var(--hol);display:block;margin-top:1px}
+  .hsnote{padding:9px 14px;font-size:12.5px;color:var(--muted);font-weight:600;border-top:1px solid var(--line)}
+
+  /* ---------- 전체 일정 목록 ---------- */
+  .listwrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+  .lmonth{background:var(--surface);border:1.5px solid var(--line-strong);border-radius:13px;overflow:hidden}
+  .lmonth .lh{padding:9px 15px;font-weight:900;font-size:15px;background:var(--brand);color:#fff}
+  .lmonth .lb{padding:10px 15px}
+  .lrow{display:flex;gap:12px;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+  .lrow:last-child{border-bottom:0}
+  .lrow .dt{font-weight:800;white-space:nowrap;min-width:92px;color:var(--brand-dark)}
+  .lrow.hol .dt,.lrow.hol .nm{color:var(--hol);font-weight:700}
+  .lrow.term .dt,.lrow.term .nm{color:var(--term);font-weight:800}
+  .lrow.exam .dt,.lrow.exam .nm{color:var(--exam);font-weight:700}
+  .lrow.event .dt,.lrow.event .nm{color:var(--event);font-weight:700}
+  .lrow.mk .dt,.lrow.mk .nm{color:var(--mk);font-weight:700}
+  .lrow.adm .dt,.lrow.adm .nm{color:var(--adm);font-weight:700}
+  .lmonth .none{font-size:12.5px;color:var(--faint);text-align:center;padding:8px 0}
+
+  footer{max-width:1200px;margin:0 auto;padding:0 18px 34px;font-size:12.5px;color:var(--faint);
+    display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+  footer a{color:var(--brand);font-weight:700;text-decoration:none}
+  footer a:hover{text-decoration:underline}
+
+  [hidden]{display:none!important}
+
+  /* ---------- print ---------- */
+  @media print{
+    @page{size:A4 portrait;margin:8mm}
+    *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+    body{background:#fff}
+    .topbar,.upcoming,footer,.yearnav .arrow,.no-print{display:none!important}
+    .wrap{padding:0;max-width:none}
+    .month,.tablewrap,.holsum,.lmonth,.semcard{page-break-inside:avoid;break-inside:avoid;border-radius:0;box-shadow:none}
+    table.cal tr,table.weeks tr,table.hs tr{page-break-inside:avoid;break-inside:avoid}
+    .months,.listwrap{grid-template-columns:repeat(2,1fr);gap:8px}
+    table.weeks{min-width:0}
+  }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">
+    <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h3M7.5 16.5h6"/></svg>
+    학사일정 안내
+  </div>
+  <div class="spacer"></div>
+  <div class="tabs" id="tabs">
+    <button data-view="cal" class="on"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>학사 월력</button>
+    <button data-view="table"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>수업일수표</button>
+    <button data-view="list"><svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>전체 일정</button>
+  </div>
+  <button class="btnprint" onclick="window.print()"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg>인쇄</button>
+</div>
+
+<div class="wrap">
+  <div class="yearnav">
+    <button class="arrow" id="yPrev" title="이전 학년도">◀</button>
+    <h1 id="yTitle">학사일정</h1>
+    <select id="ySel"></select>
+    <button class="arrow" id="yNext" title="다음 학년도">▶</button>
+  </div>
+  <div class="srcline" id="srcline"></div>
+
+  <div class="semcards" id="semcards"></div>
+  <div class="upcoming" id="upcoming" hidden></div>
+
+  <div id="viewCal"></div>
+  <div id="viewTable" hidden></div>
+  <div id="viewList" hidden></div>
+</div>
+
+<footer>
+  <span>이 페이지는 <b>학사일정 · 수업일수표 생성기</b>에서 입력한 데이터를 그대로 보여주는 열람 전용 페이지입니다.</span>
+  <a href="generator.html">⚙ 생성기(관리자) 열기</a>
+</footer>
+
+<script>
+/* ============================================================
+   0. 데이터 로드 : ① URL 공유 링크(#d=) → ② data.json → ③ 같은 브라우저의
+      생성기 입력값(localStorage) → ④ 내장 기본값  순서로 시도
+   ============================================================ */
+const LS_KEY='academic_calendar_gen_v1';
+const DEFAULT_DATA={
+  year:2026, sem:1,
+  terms:{'2026-1':{start:'2026-03-03',end:'2026-06-22'},'2026-2':{start:'2026-08-31',end:'2026-12-18'}},
+  overrides:{}, user:{}, targetWeeks:15, updated:null
+};
+function decodeShare(){
+  const m=location.hash.match(/[#&]d=([^&]+)/);
+  if(!m)return null;
+  try{return JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1])))));}catch(e){return null;}
+}
+async function loadData(){
+  const fromHash=decodeShare();
+  if(fromHash)return{d:fromHash,src:'공유 링크에 담긴 데이터'};
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(raw){const j=JSON.parse(raw);if(j&&j.terms)return{d:j,src:'이 브라우저의 생성기 입력값 (실시간 연동)'};}
+  }catch(e){}
+  try{
+    const r=await fetch('data.json',{cache:'no-store'});
+    if(r.ok){const j=await r.json();if(j&&j.terms)return{d:j,src:'게시된 데이터(data.json)'};}
+  }catch(e){}
+  return{d:DEFAULT_DATA,src:'기본값 (입력된 데이터 없음)'};
+}
+
+/* ============================================================
+   1. 한국 공휴일 엔진 + 날짜 유틸 (생성기와 동일 로직)
+   ============================================================ */
+const LUNAR={
+  2025:{seollal:'2025-01-29',buddha:'2025-05-05',chuseok:'2025-10-06'},
+  2026:{seollal:'2026-02-17',buddha:'2026-05-24',chuseok:'2026-09-25'},
+  2027:{seollal:'2027-02-07',buddha:'2027-05-13',chuseok:'2027-09-15'},
+  2028:{seollal:'2028-01-27',buddha:'2028-05-02',chuseok:'2028-10-03'},
+  2029:{seollal:'2029-02-13',buddha:'2029-05-20',chuseok:'2029-09-22'},
+  2030:{seollal:'2030-02-03',buddha:'2030-05-09',chuseok:'2030-09-12'},
+};
+const EXTRA={
+  2025:[['2025-01-27','임시공휴일'],['2025-06-03','대통령선거']],
+  2026:[['2026-06-03','지방선거']],
+};
+const FIXED=[
+  [1,1,'신정',false],[3,1,'삼일절',true],[5,5,'어린이날',true],
+  [6,6,'현충일',false],[8,15,'광복절',true],[10,3,'개천절',true],
+  [10,9,'한글날',true],[12,25,'성탄절',true],
+];
+const YEARS=[2025,2026,2027,2028,2029,2030];
+const pad=n=>String(n).padStart(2,'0');
+const toISO=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fromISO=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x;};
+const shortMD=d=>`${d.getMonth()+1}/${d.getDate()}`;
+const WKShort=['일','월','화','수','목','금','토'];
+
+function buildHolidays(year){
+  const base={};
+  const addB=(iso,name,elig,block=null)=>{(base[iso]=base[iso]||[]).push({name,elig,block});};
+  FIXED.forEach(([m,d,name,elig])=>addB(`${year}-${pad(m)}-${pad(d)}`,name,elig));
+  const L=LUNAR[year];
+  if(L){
+    const s=fromISO(L.seollal);
+    [[-1,'설날연휴'],[0,'설날'],[1,'설날연휴']].forEach(([o,n])=>addB(toISO(addDays(s,o)),n,true,'seollal'));
+    const c=fromISO(L.chuseok);
+    [[-1,'추석연휴'],[0,'추석'],[1,'추석연휴']].forEach(([o,n])=>addB(toISO(addDays(c,o)),n,true,'chuseok'));
+    addB(L.buddha,'부처님오신날',true);
+  }
+  (EXTRA[year]||[]).forEach(([iso,name])=>addB(iso,name,false));
+  const holiset=new Set(Object.keys(base));
+  const subs={};
+  const nextFree=iso=>{
+    let d=addDays(fromISO(iso),1);
+    while(d.getDay()===0||d.getDay()===6||holiset.has(toISO(d))||subs[toISO(d)])d=addDays(d,1);
+    return toISO(d);
+  };
+  ['seollal','chuseok'].forEach(block=>{
+    const days=Object.keys(base).filter(iso=>base[iso].some(x=>x.block===block)).sort();
+    if(!days.length)return;
+    const hasSun=days.some(iso=>fromISO(iso).getDay()===0);
+    const overlap=days.some(iso=>base[iso].length>1);
+    if(hasSun||overlap){const sd=nextFree(days[days.length-1]);subs[sd]='대체공휴일';}
+  });
+  Object.keys(base).sort().forEach(iso=>{
+    const lst=base[iso];
+    if(lst.some(x=>x.block))return;
+    if(!lst.some(x=>x.elig))return;
+    const wd=fromISO(iso).getDay();
+    if(wd===0||wd===6||lst.length>1){const sd=nextFree(iso);subs[sd]='대체공휴일';}
+  });
+  const out=[];
+  Object.keys(base).forEach(iso=>out.push({iso,name:base[iso].map(x=>x.name).join('·'),kind:'law'}));
+  Object.keys(subs).forEach(iso=>out.push({iso,name:subs[iso],kind:'sub'}));
+  out.sort((a,b)=>a.iso<b.iso?-1:1);
+  return out;
+}
+
+function defaultTerm(year,sem){
+  if(year===2026&&sem===1)return{start:'2026-03-03',end:'2026-06-22'};
+  if(year===2026&&sem===2)return{start:'2026-08-31',end:'2026-12-18'};
+  const firstMon=(y,m,d)=>{let x=new Date(y,m-1,d);while(x.getDay()!==1)x=addDays(x,1);return x;};
+  if(sem===1){const s=firstMon(year,3,2);return{start:toISO(s),end:toISO(addDays(s,16*7-4))};}
+  const s=firstMon(year,9,1);return{start:toISO(s),end:toISO(addDays(s,16*7-4))};
+}
+
+/* ============================================================
+   2. 계산 (생성기 computeFor / semRange / calData 이식 — 읽기 전용)
+   ============================================================ */
+let D=DEFAULT_DATA;           // 공유 데이터
+const V={year:2026,view:'cal'};  // 화면 상태
+
+const termOf=(year,sem)=>(D.terms&&D.terms[`${year}-${sem}`])||defaultTerm(year,sem);
+const usersOf=(year,sem)=>(D.user&&D.user[`${year}-${sem}`])||[];
+
+function computeFor(year,sem){
+  const t=termOf(year,sem);
+  const start=fromISO(t.start),end=fromISO(t.end);
+  const valid=start<=end;
+  const holidays=[...buildHolidays(year),...buildHolidays(year+1)];
+  const inRangeHol=holidays.filter(h=>h.iso>=t.start&&h.iso<=t.end);
+  const effMap={};
+  const push=(iso,name,off,kind)=>{
+    if(!effMap[iso])effMap[iso]={names:[],off:false,kinds:new Set(),items:[]};
+    effMap[iso].names.push(name);effMap[iso].kinds.add(kind);effMap[iso].items.push({name,kind});
+    if(off)effMap[iso].off=true;
+  };
+  const OV=D.overrides||{};
+  inRangeHol.forEach(h=>{
+    const ov=OV[h.iso]||{};
+    if(ov.hidden)return;
+    const off=ov.off!==undefined?ov.off:true;
+    push(h.iso,h.name,off,'hol');
+  });
+  usersOf(year,sem).forEach(u=>{
+    for(let d=fromISO(u.iso);d<=fromISO(u.end||u.iso);d=addDays(d,1)){
+      const iso=toISO(d);
+      if(iso<t.start||iso>t.end)continue;
+      push(iso,u.name,u.kind==='off',u.kind);
+    }
+  });
+  const cols=[[],[],[],[],[]];
+  for(let d=new Date(start);d<=end;d=addDays(d,1)){
+    const wd=d.getDay();
+    if(wd>=1&&wd<=5)cols[wd-1].push(new Date(d));
+  }
+  const rows=Math.max(...cols.map(c=>c.length),0);
+  const classDays=[];
+  for(let d=new Date(start);d<=end;d=addDays(d,1)){
+    const wd=d.getDay();
+    if(wd>=1&&wd<=5&&!(effMap[toISO(d)]&&effMap[toISO(d)].off))classDays.push(new Date(d));
+  }
+  const total=classDays.length;
+  const quarters={};
+  [1,2,3].forEach(k=>{
+    if(total>0){const idx=Math.ceil(total*k/4)-1;if(idx>=0&&idx<total)quarters[toISO(classDays[idx])]=`${k}/4`;}
+  });
+  const endISO=total>0?toISO(classDays[total-1]):null;
+  return{t,start,end,valid,cols,rows,effMap,classDays,total,quarters,endISO,inRangeHol};
+}
+
+function semRange(year,sem){
+  const t=termOf(year,sem);
+  const OV=D.overrides||{};
+  const offSet=new Set();
+  [...buildHolidays(year),...buildHolidays(year+1)].forEach(h=>{
+    if(h.iso<t.start||h.iso>t.end)return;
+    const ov=OV[h.iso]||{};
+    if(ov.hidden)return;
+    if(ov.off!==undefined?ov.off:true)offSet.add(h.iso);
+  });
+  usersOf(year,sem).forEach(u=>{
+    if(u.kind!=='off')return;
+    for(let d=fromISO(u.iso);d<=fromISO(u.end||u.iso);d=addDays(d,1))offSet.add(toISO(d));
+  });
+  const classDays=[];
+  for(let d=fromISO(t.start);d<=fromISO(t.end);d=addDays(d,1)){
+    const wd=d.getDay();
+    if(wd>=1&&wd<=5&&!offSet.has(toISO(d)))classDays.push(toISO(d));
+  }
+  const total=classDays.length;
+  const quarters={};
+  [1,2,3].forEach(k=>{
+    if(total>0){const idx=Math.ceil(total*k/4)-1;if(idx>=0&&idx<total)quarters[classDays[idx]]=`${k}/4`;}
+  });
+  return{start:t.start,end:total?classDays[total-1]:null,quarters,total};
+}
+
+function calData(year){
+  const y=year;
+  const monthsList=[[y,2],[y,3],[y,4],[y,5],[y,6],[y,7],[y,8],[y,9],[y,10],[y,11],[y+1,0],[y+1,1]];
+  const yearUsers=[...usersOf(y,1),...usersOf(y,2)];
+  const evMap={};
+  [...buildHolidays(y),...buildHolidays(y+1)].forEach(h=>{
+    const e=evMap[h.iso]=evMap[h.iso]||{names:[],kinds:new Set()};
+    e.kinds.add('hol');e.names.push(h.name);
+  });
+  yearUsers.forEach(u=>{
+    if(u.kind==='admin'){
+      const e=evMap[u.iso]=evMap[u.iso]||{names:[],kinds:new Set()};
+      e.kinds.add('admin');
+      let nm=u.name;
+      if(u.end&&u.end!==u.iso){
+        const sd=fromISO(u.iso),ed=fromISO(u.end);
+        const sameM=sd.getFullYear()===ed.getFullYear()&&sd.getMonth()===ed.getMonth();
+        nm+=`(~${sameM?ed.getDate():(ed.getMonth()+1)+'/'+ed.getDate()})`;
+      }
+      e.adm=e.adm||[];
+      if(!e.adm.includes(nm))e.adm.push(nm);
+      return;
+    }
+    for(let d=fromISO(u.iso);d<=fromISO(u.end||u.iso);d=addDays(d,1)){
+      const iso=toISO(d),e=evMap[iso]=evMap[iso]||{names:[],kinds:new Set()};
+      e.kinds.add(u.kind);
+      const showName=iso===u.iso||d.getDay()===0||d.getDate()===1;
+      if(showName&&!e.names.includes(u.name))e.names.push(u.name);
+    }
+  });
+  const termItems=[];const termLbl={};
+  [1,2].forEach(sem=>{
+    const r=semRange(y,sem);
+    [[r.start,`${sem}학기 개강`,'개강'],[r.end,`${sem}학기 종강`,'종강']].forEach(([iso,name,short])=>{
+      if(!iso)return;
+      termItems.push({s:iso,e:iso,name,type:'term'});
+      termLbl[iso]=termLbl[iso]?termLbl[iso]+'·'+short:short;
+    });
+    Object.keys(r.quarters).forEach(iso=>{
+      const q=r.quarters[iso],k=+q[0];
+      termItems.push({s:iso,e:iso,name:`${sem}학기 수업 ${q} (${Math.ceil(r.total*k/4)}일)`,type:'term'});
+      termLbl[iso]=termLbl[iso]?termLbl[iso]+'·수업 '+q:'수업 '+q;
+    });
+  });
+  const spanStart=new Date(monthsList[0][0],monthsList[0][1],1);
+  const lm=monthsList[monthsList.length-1];
+  const spanEnd=new Date(lm[0],lm[1]+1,0);
+  const items=[];
+  [...buildHolidays(y),...buildHolidays(y+1)].forEach(h=>{const d=fromISO(h.iso);if(d>=spanStart&&d<=spanEnd)items.push({s:h.iso,e:h.iso,name:h.name,type:'hol'});});
+  yearUsers.forEach(u=>{const d=fromISO(u.iso);if(d>=spanStart&&d<=spanEnd)items.push({s:u.iso,e:u.end||u.iso,name:u.name,type:u.kind});});
+  termItems.forEach(it=>{const d=fromISO(it.s);if(d>=spanStart&&d<=spanEnd)items.push(it);});
+  items.sort((a,b)=>a.s<b.s?-1:(a.s>b.s?1:0));
+  return{y,monthsList,evMap,termLbl,items};
+}
+const cls3=tp=>({hol:'hol',off:'hol',exam:'exam',event:'event',term:'term',makeup:'mk',admin:'adm'}[tp]||'');
+const dlabel=(s,e)=>{const ds=fromISO(s);return(e&&e!==s)?`${shortMD(ds)}~${shortMD(fromISO(e))}`:`${shortMD(ds)}(${WKShort[ds.getDay()]})`;};
+
+/* ============================================================
+   3. 렌더링
+   ============================================================ */
+const $=s=>document.querySelector(s);
+const todayISO=toISO(new Date());
+
+function hasInput(year){
+  return !!((D.terms&&(D.terms[`${year}-1`]||D.terms[`${year}-2`]))||
+            (D.user&&((D.user[`${year}-1`]||[]).length||(D.user[`${year}-2`]||[]).length)));
+}
+
+function renderYearNav(){
+  const sel=$('#ySel');
+  if(!sel.options.length){
+    YEARS.forEach(y=>{const o=document.createElement('option');o.value=y;sel.appendChild(o);});
+  }
+  [...sel.options].forEach(o=>{o.textContent=`${o.value}학년도${hasInput(+o.value)?' ●':''}`;});
+  sel.value=V.year;
+  $('#yTitle').textContent=`${V.year}학년도 학사일정`;
+  document.title=`${V.year}학년도 학사일정 안내`;
+  $('#yPrev').disabled=V.year<=YEARS[0];
+  $('#yNext').disabled=V.year>=YEARS[YEARS.length-1];
+}
+
+function renderSemCards(){
+  let html='';
+  [1,2].forEach(sem=>{
+    const d=computeFor(V.year,sem);
+    if(!d.valid){
+      html+=`<div class="semcard"><div class="sh"><h2>${sem}학기</h2></div>
+        <div class="qline">개강일이 종강일보다 늦게 입력되어 있습니다.</div></div>`;
+      return;
+    }
+    const q={};Object.keys(d.quarters).forEach(iso=>q[d.quarters[iso]]=shortMD(fromISO(iso)));
+    const sd=fromISO(d.t.start),ed=d.endISO?fromISO(d.endISO):null;
+    html+=`<div class="semcard">
+      <div class="sh"><h2>${sem}학기</h2>
+        <span class="period">${d.t.start.replace(/-/g,'.')} ~ ${d.t.end.replace(/-/g,'.')}</span></div>
+      <div class="sb">
+        <div class="cell start"><div class="k">개강</div><div class="v">${shortMD(sd)}<small>(${WKShort[sd.getDay()]})</small></div></div>
+        <div class="cell end"><div class="k">종강</div><div class="v">${ed?shortMD(ed):'–'}<small>${ed?`(${WKShort[ed.getDay()]})`:''}</small></div></div>
+        <div class="cell"><div class="k">총 수업일수</div><div class="v">${d.total}<small>일</small></div></div>
+      </div>
+      <div class="qline">
+        <span>수업일수 분기점 :</span>
+        <span><b>1/4</b> ${q['1/4']||'–'} (${Math.ceil(d.total/4)}일)</span>
+        <span><b>2/4</b> ${q['2/4']||'–'} (${Math.ceil(d.total*2/4)}일)</span>
+        <span><b>3/4</b> ${q['3/4']||'–'} (${Math.ceil(d.total*3/4)}일)</span>
+        <span><b>4/4</b> ${ed?shortMD(ed):'–'} (${d.total}일)</span>
+      </div>
+    </div>`;
+  });
+  $('#semcards').innerHTML=html;
+}
+
+function renderUpcoming(items){
+  const el=$('#upcoming');
+  const spanStart=`${V.year}-03-01`,spanEnd=`${V.year+1}-02-28`;
+  if(todayISO<spanStart||todayISO>`${V.year+1}-03-01`){el.hidden=true;return;}
+  const up=items.filter(it=>(it.e||it.s)>=todayISO).slice(0,5);
+  if(!up.length){el.hidden=true;return;}
+  const dday=iso=>{
+    const n=Math.round((fromISO(iso)-fromISO(todayISO))/86400000);
+    return n<=0?'진행중':(n===0?'D-DAY':`D-${n}`);
+  };
+  el.innerHTML=`<div class="ut"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>다가오는 일정</div>
+    <div class="chips">${up.map(it=>`<span class="uchip ${cls3(it.type)}"><span class="dd">${it.s<=todayISO?'진행중':dday(it.s)}</span>${dlabel(it.s,it.e)} ${it.name}</span>`).join('')}</div>`;
+  el.hidden=false;
+}
+
+function renderCalendar(){
+  const{y,monthsList,evMap,termLbl,items}=calData(V.year);
+  renderUpcoming(items);
+  const wk=['일','월','화','수','목','금','토'];
+  let html=`<div class="legend no-print">
+    <span><i style="background:var(--hol-bg);border-color:var(--hol)"></i>공휴일·휴업일</span>
+    <span><i style="background:var(--term-bg);border-color:var(--term)"></i>개강·종강·분기</span>
+    <span><i style="background:var(--exam-bg);border-color:var(--exam)"></i>시험</span>
+    <span><i style="background:var(--mk-bg);border-color:var(--mk)"></i>보강</span>
+    <span><i style="background:var(--event-bg);border-color:var(--event)"></i>행사</span>
+    <span><i style="background:#fff;border-color:var(--adm)"></i>학사(텍스트)</span></div>`;
+  html+='<div class="months">';
+  monthsList.forEach(([yy,mm])=>{
+    const first=new Date(yy,mm,1),dim=new Date(yy,mm+1,0).getDate();
+    let cells='';let dow=first.getDay();
+    for(let i=0;i<dow;i++)cells+='<td class="out"></td>';
+    for(let dd=1;dd<=dim;dd++){
+      const d=new Date(yy,mm,dd),iso=toISO(d),wd=d.getDay();
+      const ev=evMap[iso];const tm=termLbl[iso];
+      let c=[];
+      if(wd===0)c.push('sun');if(wd===6)c.push('sat');
+      let ek=null;
+      if(ev){if(ev.kinds.has('hol')||ev.kinds.has('off'))ek='ho';else if(ev.kinds.has('exam'))ek='exam';else if(ev.kinds.has('makeup'))ek='mk';else if(ev.kinds.has('event'))ek='ev';else if(ev.kinds.has('admin'))ek='adm';}
+      if(tm)c.push('term');else if(ek)c.push(ek);
+      if(iso===todayISO)c.push('today');
+      let labels=[];
+      if(tm)labels.push(tm);
+      if(ev)labels.push(...ev.names);
+      let lbl=labels.map(l=>`<span class="lbl">${l}</span>`).join('');
+      if(ev&&ev.adm)lbl+=ev.adm.map(l=>`<span class="lbl adm-lbl">${l}</span>`).join('');
+      cells+=`<td class="${c.join(' ')}"><span class="n">${dd}</span>${lbl}</td>`;
+      if(wd===6&&dd<dim)cells+='</tr><tr>';
+    }
+    for(let i=new Date(yy,mm,dim).getDay()+1;i<7;i++)cells+='<td class="out"></td>';
+    const mStart=new Date(yy,mm,1),mEnd=new Date(yy,mm+1,0);
+    const mItems=items.filter(it=>{const s=fromISO(it.s),e2=fromISO(it.e||it.s);return s<=mEnd&&e2>=mStart;});
+    const meHtml=mItems.length
+      ?mItems.map(it=>`<div class="me ${cls3(it.type)}"><span class="med">${dlabel(it.s,it.e)}</span><span class="men">${it.name}</span></div>`).join('')
+      :'<div class="none">— 일정 없음 —</div>';
+    html+=`<div class="month"><div class="mh"><svg class="icon" style="font-size:15px" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>${yy}년 ${mm+1}월</div>`+
+      `<table class="cal"><thead><tr>${wk.map((w,i)=>`<th class="${i===0?'sun':i===6?'sat':''}">${w}</th>`).join('')}</tr></thead>`+
+      `<tbody><tr>${cells}</tr></tbody></table>`+
+      `<div class="mevents"><div class="metitle">이달의 주요 일정</div>${meHtml}</div></div>`;
+  });
+  html+='</div>';
+  $('#viewCal').innerHTML=html;
+}
+
+function buildTableHTML(data,sem){
+  const t=data.t;
+  const hdW=['월','화','수','목','금'];
+  let body='';
+  for(let r=0;r<data.rows;r++){
+    let tds=`<td class="wk">${r+1}</td>`;
+    let notes=[];
+    for(let c=0;c<5;c++){
+      const d=data.cols[c][r];
+      if(!d){tds+='<td class="day"></td>';continue;}
+      const iso=toISO(d);const eff=data.effMap[iso];
+      const isOff=eff&&eff.off;
+      const isExam=eff&&!isOff&&eff.kinds.has('exam');
+      const isMakeup=eff&&!isOff&&eff.kinds.has('makeup');
+      const isStart=iso===t.start;const isEnd=iso===data.endISO;
+      let cls='day';
+      if(isOff)cls+=' off';
+      else if(isExam)cls+=' exam';
+      else if(isMakeup)cls+=' makeup';
+      if(isStart)cls+=' mark';
+      if(isEnd)cls+=' mark end';
+      let inner=`<span class="d">${shortMD(d)}</span>`;
+      if(isOff)inner+=`<span class="oname">${eff.names[0]||''}</span>`;
+      if(isExam||isMakeup){
+        const enames=[...new Set(eff.items.filter(x=>x.kind==='exam'||x.kind==='makeup').map(x=>x.name))].join('·');
+        inner+=`<span class="ename">${enames}</span>`;
+      }
+      if(isStart)inner+='<div class="badge">개강</div>';
+      if(isEnd)inner+='<div class="badge">종강</div>';
+      tds+=`<td class="${cls}">${inner}</td>`;
+      if(isExam||isMakeup)eff.items.forEach(it=>{
+        if(it.kind==='exam')notes.push({t:it.name,c:'exam'});
+        else if(it.kind==='makeup')notes.push({t:it.name,c:'mk'});
+      });
+      if(isStart)notes.push({t:`${sem}학기 개강`,c:'q'});
+      if(isEnd)notes.push({t:`${sem}학기 종강`,c:'q'});
+    }
+    const seen=new Set();
+    const chips=notes.filter(n=>{if(seen.has(n.t))return false;seen.add(n.t);return true;})
+      .map(n=>`<span class="chip ${n.c}">${n.t}</span>`).join('');
+    body+=`<tr>${tds}<td class="bigo">${chips}</td></tr>`;
+  }
+  const head=`<tr><th>주차</th>${hdW.map(w=>`<th>${w}</th>`).join('')}<th>비고</th></tr>`;
+  const offByCol=[[],[],[],[],[]];
+  Object.keys(data.effMap).forEach(iso=>{
+    if(!data.effMap[iso].off)return;
+    const d=fromISO(iso);const wd=d.getDay();
+    if(wd>=1&&wd<=5)offByCol[wd-1].push({d,names:data.effMap[iso].names});
+  });
+  offByCol.forEach(c=>c.sort((a,b)=>a.d-b.d));
+  const maxOff=Math.max(...offByCol.map(c=>c.length),0);
+  let hsRows='';
+  for(let r=0;r<maxOff;r++){
+    let cells='';
+    for(let c=0;c<5;c++){
+      const o=offByCol[c][r];
+      cells+=o?`<td><span class="hday">${shortMD(o.d)}(${WKShort[o.d.getDay()]})</span><span class="hname">${o.names.join(', ')}</span></td>`:'<td></td>';
+    }
+    if(r===0)hsRows+=`<tr><td class="lab" rowspan="${maxOff}">휴일</td>${cells}</tr>`;
+    else hsRows+=`<tr>${cells}</tr>`;
+  }
+  const holsum=maxOff?`
+    <div class="holsum">
+      <div class="ttl">${sem}학기 중 휴일 안내</div>
+      <div class="tscroll"><table class="hs">
+        <thead><tr><th>구분</th><th>월</th><th>화</th><th>수</th><th>목</th><th>금</th></tr></thead>
+        <tbody>${hsRows}</tbody>
+      </table></div>
+      <div class="hsnote">* 수업일수(${data.total}일): 1/4(${Math.ceil(data.total/4)}일), 2/4(${Math.ceil(data.total*2/4)}일), 3/4(${Math.ceil(data.total*3/4)}일)</div>
+    </div>`:'';
+  const q={};Object.keys(data.quarters).forEach(iso=>q[data.quarters[iso]]=shortMD(fromISO(iso)));
+  const footer=`<div class="tfoot">
+    <span>총 <b>${data.total}일</b></span>
+    <span class="q">1/4 ${q['1/4']||'–'} (${Math.ceil(data.total/4)}일)</span>
+    <span class="q">2/4 ${q['2/4']||'–'} (${Math.ceil(data.total*2/4)}일)</span>
+    <span class="q">3/4 ${q['3/4']||'–'} (${Math.ceil(data.total*3/4)}일)</span>
+    <span class="q">종강 ${data.endISO?shortMD(fromISO(data.endISO)):'–'} (${data.total}일)</span>
+  </div>`;
+  return `
+    <div class="semtitle"><span class="bar"></span>${V.year}학년도 ${sem}학기 수업일수
+      <span class="range">${t.start.replace(/-/g,'.')} ~ ${t.end.replace(/-/g,'.')}</span></div>
+    <div class="tablewrap"><div class="tscroll">
+      <table class="weeks"><thead>${head}</thead><tbody>${body}</tbody></table>
+    </div>${footer}</div>
+    ${holsum}`;
+}
+
+function renderTable(){
+  let html='';
+  [1,2].forEach(sem=>{
+    const d=computeFor(V.year,sem);
+    if(d.valid)html+=buildTableHTML(d,sem);
+  });
+  $('#viewTable').innerHTML=html||'<div class="none">표시할 수업일수표가 없습니다.</div>';
+}
+
+function renderList(){
+  const{monthsList,items}=calData(V.year);
+  let html='<div class="listwrap">';
+  monthsList.forEach(([yy,mm])=>{
+    const mStart=new Date(yy,mm,1),mEnd=new Date(yy,mm+1,0);
+    const mItems=items.filter(it=>{const s=fromISO(it.s);return s>=mStart&&s<=mEnd;});
+    html+=`<div class="lmonth"><div class="lh">${yy}년 ${mm+1}월</div><div class="lb">`+
+      (mItems.length
+        ?mItems.map(it=>`<div class="lrow ${cls3(it.type)}"><span class="dt">${dlabel(it.s,it.e)}</span><span class="nm">${it.name}</span></div>`).join('')
+        :'<div class="none">— 일정 없음 —</div>')+
+      '</div></div>';
+  });
+  html+='</div>';
+  $('#viewList').innerHTML=html;
+}
+
+function render(){
+  renderYearNav();
+  renderSemCards();
+  renderCalendar();
+  renderTable();
+  renderList();
+  $('#viewCal').hidden=V.view!=='cal';
+  $('#viewTable').hidden=V.view!=='table';
+  $('#viewList').hidden=V.view!=='list';
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.view===V.view));
+}
+
+/* ============================================================
+   4. 이벤트 + 초기화
+   ============================================================ */
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{V.view=b.dataset.view;render();});
+$('#ySel').onchange=e=>{V.year=+e.target.value;render();};
+$('#yPrev').onclick=()=>{if(V.year>YEARS[0]){V.year--;render();}};
+$('#yNext').onclick=()=>{if(V.year<YEARS[YEARS.length-1]){V.year++;render();}};
+window.addEventListener('hashchange',()=>{const d=decodeShare();if(d){D=d;if(D.year)V.year=D.year;$('#srcline').innerHTML=srcLine('공유 링크에 담긴 데이터');render();}});
+
+function srcLine(src){
+  const upd=D.updated?` · 마지막 수정 <b>${D.updated}</b>`:'';
+  return `데이터 출처 : <b>${src}</b>${upd} · 연도 목록의 <b>●</b> 표시는 생성기에서 입력된 데이터가 있는 학년도입니다`;
+}
+
+(async()=>{
+  const{d,src}=await loadData();
+  D=d;
+  if(D.year&&YEARS.includes(D.year))V.year=D.year;
+  $('#srcline').innerHTML=srcLine(src);
+  render();
+})();
+</script>
+</body>
+</html>
