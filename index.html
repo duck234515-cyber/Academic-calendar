@@ -263,6 +263,7 @@
     <button data-view="list"><svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>전체 일정</button>
   </div>
   <button class="btnprint" onclick="window.print()"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg>인쇄</button>
+  <button class="btnprint" id="btnAdmin" title="비밀번호 필요"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>관리자</button>
 </div>
 
 <div class="wrap">
@@ -285,7 +286,7 @@
 
 <footer>
   <span>이 페이지는 <b>학사일정 · 수업일수표 생성기</b>에서 입력한 데이터를 그대로 보여주는 열람 전용 페이지입니다.</span>
-  <a href="generator.html">⚙ 생성기(관리자) 열기</a>
+  <a href="generator.html" id="lnkAdmin">⚙ 생성기(관리자) 열기</a>
 </footer>
 
 <script>
@@ -798,6 +799,20 @@ function render(){
 /* ============================================================
    4. 이벤트 + 초기화
    ============================================================ */
+/* 관리자 진입 : 비밀번호 확인 후 생성기로 이동 (탭이 열려 있는 동안 유지) */
+const ADMIN_KEY='ac_admin_ok';
+function goAdmin(){
+  try{if(sessionStorage.getItem(ADMIN_KEY)==='1'){location.href='generator.html';return;}}catch(e){}
+  const pw=prompt('관리자 비밀번호를 입력하세요');
+  if(pw===null)return;
+  if(pw===atob('MTAzNA==')){
+    try{sessionStorage.setItem(ADMIN_KEY,'1');}catch(e){}
+    location.href='generator.html';
+  }else alert('비밀번호가 올바르지 않습니다');
+}
+$('#btnAdmin').onclick=goAdmin;
+$('#lnkAdmin').onclick=e=>{e.preventDefault();goAdmin();};
+
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{V.view=b.dataset.view;render();});
 $('#ySel').onchange=e=>{V.year=+e.target.value;render();};
 $('#yPrev').onclick=()=>{if(V.year>YEARS[0]){V.year--;render();}};

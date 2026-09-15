@@ -571,6 +571,21 @@
 </style>
 </head>
 <body>
+<script>
+/* 관리자 잠금 : 뷰어의 [관리자] 버튼을 통과했으면 그대로 진입,
+   주소로 직접 들어오면 비밀번호 확인 (틀리면 열람 페이지로 이동) */
+(function(){
+  var KEY='ac_admin_ok';
+  try{if(sessionStorage.getItem(KEY)==='1')return;}catch(e){}
+  var pw=prompt('관리자 비밀번호를 입력하세요');
+  if(pw!==null&&pw===atob('MTAzNA==')){
+    try{sessionStorage.setItem(KEY,'1');}catch(e){}
+    return;
+  }
+  alert('비밀번호가 올바르지 않습니다. 열람 페이지로 이동합니다.');
+  location.replace('./');
+})();
+</script>
 <header class="app">
   <div class="logo">
     <svg class="icon" style="font-size:22px" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h3M7.5 16.5h6"/></svg>
