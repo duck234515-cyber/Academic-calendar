@@ -322,7 +322,8 @@ function embeddedData(){
 }
 /* 비교·게시용 핵심 필드만 추출 (관리자 비밀번호 해시 포함 — 게시 시 함께 배포) */
 const coreOf=d=>({year:d.year,sem:d.sem,terms:d.terms||{},overrides:d.overrides||{},
-                  user:d.user||{},targetWeeks:d.targetWeeks||15,adminPwHash:d.adminPwHash||''});
+                  user:d.user||{},targetWeeks:d.targetWeeks||15,adminPwHash:d.adminPwHash||'',
+                  lockYear:d.lockYear!==false});
 async function loadData(){
   const fromHash=decodeShare();
   if(fromHash)return{d:fromHash,src:'공유 링크에 담긴 데이터',hash:true};
@@ -566,6 +567,12 @@ function hasInput(year){
 }
 
 function renderYearNav(){
+  /* 관리자가 학년도를 고정(lockYear)하면 그 학년도만 표시하고 연도 이동을 숨김 */
+  const locked=D.lockYear!==false;
+  if(locked&&D.year&&YEARS.includes(D.year))V.year=D.year;
+  $('#yPrev').hidden=locked;
+  $('#yNext').hidden=locked;
+  $('#ySel').hidden=locked;
   const sel=$('#ySel');
   if(!sel.options.length){
     YEARS.forEach(y=>{const o=document.createElement('option');o.value=y;sel.appendChild(o);});
@@ -828,11 +835,14 @@ document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{V.view=b.dat
 $('#ySel').onchange=e=>{V.year=+e.target.value;render();};
 $('#yPrev').onclick=()=>{if(V.year>YEARS[0]){V.year--;render();}};
 $('#yNext').onclick=()=>{if(V.year<YEARS[YEARS.length-1]){V.year++;render();}};
-window.addEventListener('hashchange',()=>{const d=decodeShare();if(d){D=d;if(D.year)V.year=D.year;$('#srcline').innerHTML=srcLine('공유 링크에 담긴 데이터');render();}});
+window.addEventListener('hashchange',()=>{const d=decodeShare();if(d){D=d;if(D.year)V.year=D.year;$('#srcline').innerHTML=srcLine('공유 링크에 담긴 데이터');render();setupPublish(d);}});
 
 function srcLine(src){
   const upd=D.updated?` · 마지막 수정 <b>${D.updated}</b>`:'';
-  return `데이터 출처 : <b>${src}</b>${upd} · 연도 목록의 <b>●</b> 표시는 생성기에서 입력된 데이터가 있는 학년도입니다`;
+  const tail=D.lockYear!==false
+    ?''
+    :' · 연도 목록의 <b>●</b> 표시는 생성기에서 입력된 데이터가 있는 학년도입니다';
+  return `데이터 출처 : <b>${src}</b>${upd}${tail}`;
 }
 
 /* ============================================================
@@ -841,18 +851,19 @@ function srcLine(src){
       새 버전으로 저장되어, 같은 주소의 모든 열람자에게 즉시 반영됩니다.
       (아티팩트 전용 — GitHub Pages 등에서는 data.json 교체 커밋으로 게시)
    ============================================================ */
-async function setupPublish(isHash){
-  if(isHash)return;
+async function setupPublish(hashData){
   const bar=$('#pubbar');
-  const ls=readLS();
-  if(!ls)return;
+  const srcData=hashData||readLS();    // 공유 링크로 연 데이터도 게시 가능 (기기·브라우저가 달라도 동작)
+  if(!srcData)return;
   if(!(window.claude&&window.claude.use))return;      // 런타임 없는 호스팅(Pages 등)
   const art=await window.claude.use('artifact');
   if(!art)return;                                     // 열람 전용 보기
   const emb=embeddedData();
-  const cur=coreOf(ls);
+  const cur=coreOf(srcData);
   if(emb&&JSON.stringify(cur)===JSON.stringify(coreOf(emb)))return;  // 이미 최신
-  bar.innerHTML=`<span>이 브라우저의 생성기 입력값이 게시본과 다릅니다. 게시하면 이 주소로 접속하는 모든 사람에게 반영됩니다.</span>
+  const what=hashData?'이 공유 링크의 데이터가':'이 브라우저의 생성기 입력값이';
+  bar.className='pubbar';
+  bar.innerHTML=`<span>${what} 게시본과 다릅니다. 게시하면 이 주소로 접속하는 모든 사람에게 반영됩니다.</span>
     <button id="btnPublish">지금 게시</button>`;
   bar.hidden=false;
   $('#btnPublish').onclick=async()=>{
@@ -881,7 +892,7 @@ async function setupPublish(isHash){
         bar.className='pubbar err';
         bar.innerHTML=`<span>게시하지 못했습니다 (${e&&e.message?e.message:'알 수 없는 오류'}). 잠시 후 다시 시도해 주세요.</span>
           <button id="btnPublish">다시 시도</button>`;
-        $('#btnPublish').onclick=()=>{bar.className='pubbar';setupPublish(false);};
+        $('#btnPublish').onclick=()=>{setupPublish(hashData);};
       }
     }
   };
@@ -893,7 +904,7 @@ async function setupPublish(isHash){
   if(D.year&&YEARS.includes(D.year))V.year=D.year;
   $('#srcline').innerHTML=srcLine(src);
   render();
-  setupPublish(!!hash);
+  setupPublish(hash?d:null);
 })();
 </script>
 </body>

@@ -633,6 +633,7 @@ window.AC_PW_HASH_P=(async function(){
   <button class="btn primary" id="btnXls"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>엑셀 내보내기</button>
   <button class="btn" id="btnShare"><svg class="icon" viewBox="0 0 24 24"><path d="M15 7a3 3 0 1 0 0-4 3 3 0 0 0 0 4zM6 14a3 3 0 1 0 0-4 3 3 0 0 0 0 4zm9 7a3 3 0 1 0 0-4 3 3 0 0 0 0 4zM8.6 10.5l4.8-2.7M8.6 13.5l4.8 2.7"/></svg>뷰어 공유 링크</button>
   <button class="btn" id="btnData"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v10m0 0l-3.5-3.5M12 13l3.5-3.5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>뷰어 데이터 저장</button>
+  <button class="btn" id="btnImport" title="공유 링크·data.json 붙여넣기로 가져오기"><svg class="icon" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4l4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>가져오기</button>
   <button class="btn ghost" id="btnPw" title="관리자 비밀번호 변경"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5M12 14.5v2.5"/></svg>비밀번호</button>
   <a class="btn ghost" href="./" id="lnkViewer" title="열람 전용 페이지 열기"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/></svg>뷰어 열기</a>
 </header>
@@ -665,6 +666,13 @@ window.AC_PW_HASH_P=(async function(){
       <option value="16">16주</option>
       <option value="17">17주</option>
     </select>
+  </div>
+  <div class="field">
+    <label><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/></svg>뷰어 표시 연도</label>
+    <div class="seg" id="lockSeg">
+      <button data-lock="1" class="on">이 학년도만</button>
+      <button data-lock="0">전체 열람</button>
+    </div>
   </div>
   <div class="field">
     <label>&nbsp;</label>
@@ -848,6 +856,7 @@ const state={
   view:'table',
   targetWeeks:15,           // 휴일 제외 목표 수업 주차 (요일별)
   uid:1,
+  lockYear:true,            // 뷰어에 현재 학년도만 표시 (false = 전체 연도 열람 허용)
 };
 
 /* ===== 자동 저장 (브라우저 localStorage, 백엔드 불필요) ===== */
@@ -858,7 +867,7 @@ function saveState(){
       year:state.year, sem:state.sem, terms:state.terms,
       overrides:state.overrides, user:state.user,
       targetWeeks:state.targetWeeks, uid:state.uid,
-      adminPwHash:state.adminPwHash
+      adminPwHash:state.adminPwHash, lockYear:state.lockYear
     }));
   }catch(e){}
 }
@@ -866,7 +875,7 @@ function loadState(){
   try{
     const raw=localStorage.getItem(LS_KEY); if(!raw)return;
     const d=JSON.parse(raw);
-    ['year','sem','terms','overrides','user','targetWeeks','uid','adminPwHash'].forEach(k=>{ if(d[k]!==undefined)state[k]=d[k]; });
+    ['year','sem','terms','overrides','user','targetWeeks','uid','adminPwHash','lockYear'].forEach(k=>{ if(d[k]!==undefined)state[k]=d[k]; });
   }catch(e){}
 }
 
@@ -958,6 +967,7 @@ function renderControls(){
   if(!y.options.length){YEARS.forEach(yr=>{const o=document.createElement('option');o.value=yr;o.textContent=yr+'학년도';y.appendChild(o);});}
   y.value=state.year;
   document.querySelectorAll('#semSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.sem===state.sem));
+  document.querySelectorAll('#lockSeg button').forEach(b=>b.classList.toggle('on',(+b.dataset.lock===1)===(state.lockYear!==false)));
   const t=curTerm(); $('#start').value=t.start; $('#end').value=t.end;
   const tg=$('#target'); if(tg)tg.value=state.targetWeeks;
 }
@@ -1368,6 +1378,10 @@ function render(){
    ============================================================ */
 $('#year').onchange=e=>{state.year=+e.target.value;render();};
 document.querySelectorAll('#semSeg button').forEach(b=>b.onclick=()=>{state.sem=+b.dataset.sem;render();});
+document.querySelectorAll('#lockSeg button').forEach(b=>b.onclick=()=>{
+  state.lockYear=+b.dataset.lock===1;render();
+  toast(state.lockYear?'뷰어에 현재 학년도만 표시됩니다 — 게시해야 적용됩니다':'뷰어에서 전체 연도를 열람할 수 있습니다 — 게시해야 적용됩니다');
+});
 /* ---- 날짜 자유 입력 파서 : 3/3 · 0303 · 20260303 · 2026-03-03 · 2026.3.3 · 2026년 3월 3일 ---- */
 function parseDateInput(v){
   if(!v)return null;
@@ -1613,10 +1627,32 @@ $('#btnXls').onclick=()=>{
 /* ---- 뷰어(index.html) 연동 : 공유 링크 + data.json 내보내기 ---- */
 function exportViewerData(){
   const d={updated:toISO(new Date()),year:state.year,sem:state.sem,terms:state.terms,
-           overrides:state.overrides,user:state.user,targetWeeks:state.targetWeeks};
+           overrides:state.overrides,user:state.user,targetWeeks:state.targetWeeks,
+           lockYear:state.lockYear!==false};
   if(state.adminPwHash)d.adminPwHash=state.adminPwHash;
   return d;
 }
+/* ---- 데이터 가져오기 : 공유 링크 또는 data.json 내용 붙여넣기 ---- */
+function parseImport(txt){
+  txt=String(txt).trim();
+  if(txt.startsWith('{')){try{const j=JSON.parse(txt);if(j&&j.terms)return j;}catch(e){}}
+  const m=txt.match(/[#&]d=([^&\s]+)/);
+  const b64=m?m[1]:txt;
+  try{const j=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(b64)))));if(j&&j.terms)return j;}catch(e){}
+  return null;
+}
+$('#btnImport').onclick=()=>{
+  const txt=prompt('다른 곳에서 만든 데이터를 가져옵니다.\n[뷰어 공유 링크] 전체 또는 data.json 파일 내용을 붙여넣으세요.');
+  if(!txt)return;
+  const d=parseImport(txt);
+  if(!d){toast('데이터를 인식하지 못했습니다 — 공유 링크 전체나 data.json 내용을 붙여넣어 주세요');return;}
+  if(!confirm('가져온 데이터로 현재 입력값을 덮어쓸까요?\n(학년도·학기·개강종강일·일정·공휴일 설정이 모두 교체됩니다)'))return;
+  ['year','sem','terms','overrides','user','targetWeeks','adminPwHash','lockYear'].forEach(k=>{if(d[k]!==undefined)state[k]=d[k];});
+  let mx=0;Object.values(state.user||{}).forEach(a=>(a||[]).forEach(u=>{if(+u.id>mx)mx=+u.id;}));
+  state.uid=mx+1;
+  render();
+  toast('가져오기 완료 — 내용을 확인한 뒤 뷰어에서 [지금 게시] 하세요');
+};
 /* ---- 관리자 비밀번호 변경 : 해시만 저장. 게시해야 다른 기기에도 적용 ---- */
 $('#btnPw').onclick=async()=>{
   if(!(window.crypto&&crypto.subtle)){alert('https 환경에서만 변경할 수 있습니다');return;}
