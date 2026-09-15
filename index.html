@@ -71,6 +71,17 @@
   .srcline{text-align:center;font-size:12.5px;color:var(--faint);margin-bottom:16px}
   .srcline b{color:var(--muted)}
 
+  /* 관리자 게시 배너 (아티팩트에서 소유자에게만 의미 있음) */
+  .pubbar{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+    margin:0 0 16px;padding:11px 16px;border:1.5px solid #d8a23f;background:#fdf4e3;
+    border-radius:11px;font-size:13.5px;font-weight:700;color:#8a5a12}
+  .pubbar.ok{border-color:var(--term);background:var(--term-bg);color:var(--term)}
+  .pubbar.err{border-color:var(--hol);background:var(--hol-bg);color:var(--hol)}
+  .pubbar button{border:0;background:var(--brand);color:#fff;cursor:pointer;font-family:inherit;
+    padding:8px 16px;border-radius:8px;font-size:13.5px;font-weight:800}
+  .pubbar button:hover{background:var(--brand-dark)}
+  .pubbar button:disabled{opacity:.5;cursor:default}
+
   .semcards{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px}
   @media (max-width:860px){.semcards{grid-template-columns:1fr}}
   .semcard{background:var(--surface);border:1.5px solid var(--line-strong);border-radius:14px;overflow:hidden}
@@ -239,6 +250,7 @@
 </style>
 </head>
 <body>
+<script id="published-data" type="application/json">null</script>
 <div class="topbar">
   <div class="brand">
     <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h3M7.5 16.5h6"/></svg>
@@ -261,6 +273,7 @@
     <button class="arrow" id="yNext" title="다음 학년도">▶</button>
   </div>
   <div class="srcline" id="srcline"></div>
+  <div class="pubbar" id="pubbar" hidden></div>
 
   <div class="semcards" id="semcards"></div>
   <div class="upcoming" id="upcoming" hidden></div>
@@ -291,13 +304,32 @@ function decodeShare(){
   if(!m)return null;
   try{return JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1])))));}catch(e){return null;}
 }
-async function loadData(){
-  const fromHash=decodeShare();
-  if(fromHash)return{d:fromHash,src:'공유 링크에 담긴 데이터'};
+function readLS(){
   try{
     const raw=localStorage.getItem(LS_KEY);
-    if(raw){const j=JSON.parse(raw);if(j&&j.terms)return{d:j,src:'이 브라우저의 생성기 입력값 (실시간 연동)'};}
+    if(raw){const j=JSON.parse(raw);if(j&&j.terms)return j;}
   }catch(e){}
+  return null;
+}
+function embeddedData(){
+  try{
+    const el=document.getElementById('published-data');
+    const j=JSON.parse(el.textContent);
+    if(j&&j.terms)return j;
+  }catch(e){}
+  return null;
+}
+/* 비교·게시용 핵심 필드만 추출 */
+const coreOf=d=>({year:d.year,sem:d.sem,terms:d.terms||{},overrides:d.overrides||{},
+                  user:d.user||{},targetWeeks:d.targetWeeks||15});
+async function loadData(){
+  const fromHash=decodeShare();
+  if(fromHash)return{d:fromHash,src:'공유 링크에 담긴 데이터',hash:true};
+  const ls=readLS(),emb=embeddedData();
+  if(ls&&emb&&JSON.stringify(coreOf(ls))===JSON.stringify(coreOf(emb)))
+    return{d:emb,src:'게시된 데이터 (최신)'};
+  if(ls)return{d:ls,src:'이 브라우저의 생성기 입력값 (실시간 연동)'};
+  if(emb)return{d:emb,src:'게시된 데이터'};
   try{
     const r=await fetch('data.json',{cache:'no-store'});
     if(r.ok){const j=await r.json();if(j&&j.terms)return{d:j,src:'게시된 데이터(data.json)'};}
@@ -777,12 +809,65 @@ function srcLine(src){
   return `데이터 출처 : <b>${src}</b>${upd} · 연도 목록의 <b>●</b> 표시는 생성기에서 입력된 데이터가 있는 학년도입니다`;
 }
 
+/* ============================================================
+   5. 관리자 즉시 게시 : 생성기 입력값(localStorage)이 게시본과 다르면
+      소유자에게 [지금 게시] 버튼 표시 — 누르면 이 페이지가 데이터를 품은
+      새 버전으로 저장되어, 같은 주소의 모든 열람자에게 즉시 반영됩니다.
+      (아티팩트 전용 — GitHub Pages 등에서는 data.json 교체 커밋으로 게시)
+   ============================================================ */
+async function setupPublish(isHash){
+  if(isHash)return;
+  const bar=$('#pubbar');
+  const ls=readLS();
+  if(!ls)return;
+  if(!(window.claude&&window.claude.use))return;      // 런타임 없는 호스팅(Pages 등)
+  const art=await window.claude.use('artifact');
+  if(!art)return;                                     // 열람 전용 보기
+  const emb=embeddedData();
+  const cur=coreOf(ls);
+  if(emb&&JSON.stringify(cur)===JSON.stringify(coreOf(emb)))return;  // 이미 최신
+  bar.innerHTML=`<span>이 브라우저의 생성기 입력값이 게시본과 다릅니다. 게시하면 이 주소로 접속하는 모든 사람에게 반영됩니다.</span>
+    <button id="btnPublish">지금 게시</button>`;
+  bar.hidden=false;
+  $('#btnPublish').onclick=async()=>{
+    const btn=$('#btnPublish');btn.disabled=true;btn.textContent='게시 중…';
+    try{
+      const res=await fetch(location.pathname+location.search,{cache:'no-store'});
+      const html=await res.text();
+      const OPEN='<scr'+'ipt id="published-data" type="application/json">';
+      const CLOSE='</scr'+'ipt>';
+      const i=html.indexOf(OPEN);
+      const j=i>=0?html.indexOf(CLOSE,i):-1;
+      if(i<0||j<0)throw new Error('데이터 블록을 찾지 못했습니다');
+      const payload=JSON.stringify({...cur,updated:todayISO}).replace(/</g,'\\u003c');
+      let out=html.slice(0,i+OPEN.length)+payload+html.slice(j);
+      if(!/^\s*<!doctype/i.test(out))out='<!doctype html>\n'+out;
+      await art.publish(out);
+      bar.className='pubbar ok';
+      bar.innerHTML='<span>게시 완료 — 모든 열람자에게 반영되었습니다. 화면이 곧 새 버전으로 갱신됩니다.</span>';
+    }catch(e){
+      if(e&&(e.code==='not_writer'||e.code==='not_granted')){
+        bar.hidden=true;                              // 열람 전용 계정
+      }else if(e&&e.code==='conflict'){
+        bar.className='pubbar ok';                    // 다른 곳에서 먼저 게시됨 → 자동 새로고침됨
+        bar.innerHTML='<span>다른 곳에서 먼저 게시되어 최신 버전으로 갱신됩니다.</span>';
+      }else{
+        bar.className='pubbar err';
+        bar.innerHTML=`<span>게시하지 못했습니다 (${e&&e.message?e.message:'알 수 없는 오류'}). 잠시 후 다시 시도해 주세요.</span>
+          <button id="btnPublish">다시 시도</button>`;
+        $('#btnPublish').onclick=()=>{bar.className='pubbar';setupPublish(false);};
+      }
+    }
+  };
+}
+
 (async()=>{
-  const{d,src}=await loadData();
+  const{d,src,hash}=await loadData();
   D=d;
   if(D.year&&YEARS.includes(D.year))V.year=D.year;
   $('#srcline').innerHTML=srcLine(src);
   render();
+  setupPublish(!!hash);
 })();
 </script>
 </body>
