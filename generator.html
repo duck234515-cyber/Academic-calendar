@@ -1641,17 +1641,40 @@ function parseImport(txt){
   try{const j=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(b64)))));if(j&&j.terms)return j;}catch(e){}
   return null;
 }
-$('#btnImport').onclick=()=>{
-  const txt=prompt('다른 곳에서 만든 데이터를 가져옵니다.\n[뷰어 공유 링크] 전체 또는 data.json 파일 내용을 붙여넣으세요.');
-  if(!txt)return;
-  const d=parseImport(txt);
-  if(!d){toast('데이터를 인식하지 못했습니다 — 공유 링크 전체나 data.json 내용을 붙여넣어 주세요');return;}
+function applyImport(d){
   if(!confirm('가져온 데이터로 현재 입력값을 덮어쓸까요?\n(학년도·학기·개강종강일·일정·공휴일 설정이 모두 교체됩니다)'))return;
   ['year','sem','terms','overrides','user','targetWeeks','adminPwHash','lockYear'].forEach(k=>{if(d[k]!==undefined)state[k]=d[k];});
   let mx=0;Object.values(state.user||{}).forEach(a=>(a||[]).forEach(u=>{if(+u.id>mx)mx=+u.id;}));
   state.uid=mx+1;
   render();
   toast('가져오기 완료 — 내용을 확인한 뒤 뷰어에서 [지금 게시] 하세요');
+}
+/* 파일 업로드(data.json)로 가져오기 — 파일 선택 취소 시 붙여넣기 입력도 지원 */
+const impFile=document.createElement('input');
+impFile.type='file';impFile.accept='.json,application/json,.txt';
+impFile.style.display='none';document.body.appendChild(impFile);
+impFile.onchange=()=>{
+  const f=impFile.files&&impFile.files[0];
+  if(!f)return;
+  const rd=new FileReader();
+  rd.onload=()=>{
+    const d=parseImport(rd.result);
+    if(!d){toast('파일에서 데이터를 인식하지 못했습니다 — [뷰어 데이터 저장]으로 만든 data.json 파일을 선택하세요');return;}
+    applyImport(d);
+  };
+  rd.onerror=()=>toast('파일을 읽지 못했습니다');
+  rd.readAsText(f,'utf-8');
+};
+$('#btnImport').onclick=()=>{
+  if(confirm('데이터 파일(data.json)을 업로드해 가져옵니다.\n\n[확인] = 파일 선택\n[취소] = 공유 링크·JSON 붙여넣기로 가져오기')){
+    impFile.value='';impFile.click();
+  }else{
+    const txt=prompt('[뷰어 공유 링크] 전체 또는 data.json 파일 내용을 붙여넣으세요.');
+    if(!txt)return;
+    const d=parseImport(txt);
+    if(!d){toast('데이터를 인식하지 못했습니다 — 공유 링크 전체나 data.json 내용을 붙여넣어 주세요');return;}
+    applyImport(d);
+  }
 };
 /* ---- 관리자 비밀번호 변경 : 해시만 저장. 게시해야 다른 기기에도 적용 ---- */
 $('#btnPw').onclick=async()=>{
