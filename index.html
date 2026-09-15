@@ -320,9 +320,9 @@ function embeddedData(){
   }catch(e){}
   return null;
 }
-/* 비교·게시용 핵심 필드만 추출 */
+/* 비교·게시용 핵심 필드만 추출 (관리자 비밀번호 해시 포함 — 게시 시 함께 배포) */
 const coreOf=d=>({year:d.year,sem:d.sem,terms:d.terms||{},overrides:d.overrides||{},
-                  user:d.user||{},targetWeeks:d.targetWeeks||15});
+                  user:d.user||{},targetWeeks:d.targetWeeks||15,adminPwHash:d.adminPwHash||''});
 async function loadData(){
   const fromHash=decodeShare();
   if(fromHash)return{d:fromHash,src:'공유 링크에 담긴 데이터',hash:true};
@@ -799,13 +799,24 @@ function render(){
 /* ============================================================
    4. 이벤트 + 초기화
    ============================================================ */
-/* 관리자 진입 : 비밀번호 확인 후 생성기로 이동 (탭이 열려 있는 동안 유지) */
+/* 관리자 진입 : 비밀번호 확인 후 생성기로 이동 (탭이 열려 있는 동안 유지)
+   비밀번호는 SHA-256 해시로만 비교 — 게시 데이터의 adminPwHash가 있으면 그 값,
+   없으면 초기값을 사용 (생성기의 [비밀번호] 버튼에서 변경 → 게시하면 전체 적용) */
 const ADMIN_KEY='ac_admin_ok';
-function goAdmin(){
+const DEFAULT_PW_HASH='6719009a76851c4bed2fcdea10b635c1bd58bf12af0c1fea3a470a87d3ee6995';
+async function sha256hex(s){
+  const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+async function goAdmin(){
   try{if(sessionStorage.getItem(ADMIN_KEY)==='1'){location.href='generator.html';return;}}catch(e){}
   const pw=prompt('관리자 비밀번호를 입력하세요');
   if(pw===null)return;
-  if(pw===atob('MTAzNA==')){
+  if(!(window.crypto&&crypto.subtle)){alert('이 기능은 https 환경에서만 사용할 수 있습니다');return;}
+  const hash=D.adminPwHash||DEFAULT_PW_HASH;
+  let ok=false;
+  try{ok=(await sha256hex(pw))===hash;}catch(e){}
+  if(ok){
     try{sessionStorage.setItem(ADMIN_KEY,'1');}catch(e){}
     location.href='generator.html';
   }else alert('비밀번호가 올바르지 않습니다');

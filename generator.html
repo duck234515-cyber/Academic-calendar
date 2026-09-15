@@ -573,14 +573,47 @@
 <body>
 <script>
 /* 관리자 잠금 : 뷰어의 [관리자] 버튼을 통과했으면 그대로 진입,
-   주소로 직접 들어오면 비밀번호 확인 (틀리면 열람 페이지로 이동) */
-(function(){
+   주소로 직접 들어오면 비밀번호 확인 (틀리면 열람 페이지로 이동)
+   비밀번호는 SHA-256 해시로만 저장·비교. 유효 해시 우선순위:
+   이 브라우저의 변경값(localStorage) → 게시본(index.html 내장) → data.json → 초기값 */
+document.documentElement.style.visibility='hidden';
+window.AC_DEFAULT_PW_HASH='6719009a76851c4bed2fcdea10b635c1bd58bf12af0c1fea3a470a87d3ee6995';
+window.AC_SHA256=async function(s){
+  const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+};
+window.AC_PW_HASH_P=(async function(){
+  try{
+    const st=JSON.parse(localStorage.getItem('academic_calendar_gen_v1'));
+    if(st&&st.adminPwHash)return st.adminPwHash;
+  }catch(e){}
+  try{
+    const t=await (await fetch('./',{cache:'no-store'})).text();
+    const m=t.match(/id="published-data"[^>]*>([\s\S]*?)<\/scr/);
+    if(m){const j=JSON.parse(m[1]);if(j&&j.adminPwHash)return j.adminPwHash;}
+  }catch(e){}
+  try{
+    const j=await (await fetch('data.json',{cache:'no-store'})).json();
+    if(j&&j.adminPwHash)return j.adminPwHash;
+  }catch(e){}
+  return window.AC_DEFAULT_PW_HASH;
+})();
+(async function(){
   var KEY='ac_admin_ok';
-  try{if(sessionStorage.getItem(KEY)==='1')return;}catch(e){}
+  var show=function(){document.documentElement.style.visibility='';};
+  try{if(sessionStorage.getItem(KEY)==='1'){show();return;}}catch(e){}
   var pw=prompt('관리자 비밀번호를 입력하세요');
-  if(pw!==null&&pw===atob('MTAzNA==')){
+  var ok=false;
+  if(pw!==null){
+    if(!(window.crypto&&crypto.subtle)){
+      alert('이 페이지는 https 환경에서만 열 수 있습니다.');
+    }else{
+      try{ok=(await window.AC_SHA256(pw))===(await window.AC_PW_HASH_P);}catch(e){}
+    }
+  }
+  if(ok){
     try{sessionStorage.setItem(KEY,'1');}catch(e){}
-    return;
+    show();return;
   }
   alert('비밀번호가 올바르지 않습니다. 열람 페이지로 이동합니다.');
   location.replace('./');
@@ -600,6 +633,7 @@
   <button class="btn primary" id="btnXls"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>엑셀 내보내기</button>
   <button class="btn" id="btnShare"><svg class="icon" viewBox="0 0 24 24"><path d="M15 7a3 3 0 1 0 0-4 3 3 0 0 0 0 4zM6 14a3 3 0 1 0 0-4 3 3 0 0 0 0 4zm9 7a3 3 0 1 0 0-4 3 3 0 0 0 0 4zM8.6 10.5l4.8-2.7M8.6 13.5l4.8 2.7"/></svg>뷰어 공유 링크</button>
   <button class="btn" id="btnData"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v10m0 0l-3.5-3.5M12 13l3.5-3.5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>뷰어 데이터 저장</button>
+  <button class="btn ghost" id="btnPw" title="관리자 비밀번호 변경"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5M12 14.5v2.5"/></svg>비밀번호</button>
   <a class="btn ghost" href="./" id="lnkViewer" title="열람 전용 페이지 열기"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/></svg>뷰어 열기</a>
 </header>
 
@@ -823,7 +857,8 @@ function saveState(){
     localStorage.setItem(LS_KEY, JSON.stringify({
       year:state.year, sem:state.sem, terms:state.terms,
       overrides:state.overrides, user:state.user,
-      targetWeeks:state.targetWeeks, uid:state.uid
+      targetWeeks:state.targetWeeks, uid:state.uid,
+      adminPwHash:state.adminPwHash
     }));
   }catch(e){}
 }
@@ -831,7 +866,7 @@ function loadState(){
   try{
     const raw=localStorage.getItem(LS_KEY); if(!raw)return;
     const d=JSON.parse(raw);
-    ['year','sem','terms','overrides','user','targetWeeks','uid'].forEach(k=>{ if(d[k]!==undefined)state[k]=d[k]; });
+    ['year','sem','terms','overrides','user','targetWeeks','uid','adminPwHash'].forEach(k=>{ if(d[k]!==undefined)state[k]=d[k]; });
   }catch(e){}
 }
 
@@ -1577,9 +1612,25 @@ $('#btnXls').onclick=()=>{
 
 /* ---- 뷰어(index.html) 연동 : 공유 링크 + data.json 내보내기 ---- */
 function exportViewerData(){
-  return {updated:toISO(new Date()),year:state.year,sem:state.sem,terms:state.terms,
-          overrides:state.overrides,user:state.user,targetWeeks:state.targetWeeks};
+  const d={updated:toISO(new Date()),year:state.year,sem:state.sem,terms:state.terms,
+           overrides:state.overrides,user:state.user,targetWeeks:state.targetWeeks};
+  if(state.adminPwHash)d.adminPwHash=state.adminPwHash;
+  return d;
 }
+/* ---- 관리자 비밀번호 변경 : 해시만 저장. 게시해야 다른 기기에도 적용 ---- */
+$('#btnPw').onclick=async()=>{
+  if(!(window.crypto&&crypto.subtle)){alert('https 환경에서만 변경할 수 있습니다');return;}
+  const cur=prompt('현재 비밀번호를 입력하세요'); if(cur===null)return;
+  const curHash=state.adminPwHash||(window.AC_PW_HASH_P?await window.AC_PW_HASH_P:window.AC_DEFAULT_PW_HASH);
+  if(await window.AC_SHA256(cur)!==curHash){alert('현재 비밀번호가 올바르지 않습니다');return;}
+  const nw=prompt('새 비밀번호를 입력하세요 (4자 이상 권장, 숫자·문자 섞으면 더 안전)'); if(nw===null)return;
+  if(nw.trim().length<4){alert('4자 이상으로 입력해 주세요');return;}
+  const nw2=prompt('새 비밀번호를 한 번 더 입력하세요'); if(nw2===null)return;
+  if(nw!==nw2){alert('두 입력값이 일치하지 않습니다');return;}
+  state.adminPwHash=await window.AC_SHA256(nw.trim());
+  saveState();
+  alert('비밀번호가 변경되었습니다.\n\n지금은 이 브라우저에만 적용된 상태입니다.\n뷰어에서 [지금 게시] 하거나 data.json을 새로 올리면 모든 기기의 잠금에 적용됩니다.');
+};
 const viewerURL=()=>location.protocol==='file:'
   ? new URL('index.html',location.href).href
   : new URL('.',location.href).href;   // 웹 호스팅에서는 디렉터리 주소가 곧 뷰어(index.html)
