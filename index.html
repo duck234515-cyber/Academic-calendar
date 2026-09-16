@@ -491,7 +491,10 @@ async function fetchSheetRows(sheetName){
                         {signal:ctl.signal,cache:'no-store'});
     clearTimeout(to);
     if(!r.ok)throw new Error('HTTP '+r.status);
-    return parseCSV(await r.text());
+    const txt=await r.text();
+    const rows=parseCSV(txt);
+    rows._raw=txt;rows._ct=r.headers.get('content-type')||'';   // 진단용
+    return rows;
   }catch(e){
     e1=e&&e.name==='AbortError'?'시간초과':String(e&&e.message||e);
   }
@@ -505,8 +508,15 @@ let SHEET_ERR='';   // 시트 읽기 실패 원인 (출처 줄에 표시)
 async function loadSheet(){
   if(!SHEET_ID)return null;
   try{
-    const d=sheetToData(await fetchSheetRows(''));
-    if(!d)SHEET_ERR='응답을 받았으나 시트 형식을 인식하지 못함 (로그인 페이지 응답 가능성 — 공유 설정 확인)';
+    const rows=await fetchSheetRows('');
+    const d=sheetToData(rows);
+    if(!d){
+      // 무엇이 돌아왔는지 그대로 보여줘 원인을 특정 (HTML 무해화: 꺾쇠 치환)
+      const head=String(rows._raw||'').slice(0,150).replace(/\s+/g,' ')
+                 .replace(/[<>&]/g,c=>({'<':'‹','>':'›','&':'＆'}[c]));
+      SHEET_ERR='시트 형식 인식 실패'+(rows._ct?` · 응답형식: ${rows._ct.split(';')[0]}`:'')
+               +(head?` · 응답 시작: ${head}`:' · 빈 응답');
+    }
     return d;
   }catch(e){SHEET_ERR=String(e&&e.message||e).replace(/[<>]/g,'');return null;}
 }
