@@ -1754,7 +1754,7 @@ function renderOpinions(){
   const box=$('#opList'),line=$('#fbPeriodLine');
   if(!box||!line)return;
   line.innerHTML=state.feedback&&state.feedback.start
-    ?`의견 수렴 기간 : <b>${state.feedback.start} ~ ${state.feedback.end}</b> <em>(게시해야 뷰어에 적용)</em>`
+    ?`의견 수렴 기간 : <b>${state.feedback.start} ~ ${state.feedback.end}</b> <em>([시트에 반영]해야 뷰어에 적용)</em>`
     :'의견 수렴 기간이 <b>설정되지 않았습니다</b>';
   const ops=state.opinions||[];
   $('#opCount').textContent=ops.filter(o=>o.status!=='done').length;
@@ -1820,7 +1820,7 @@ $('#btnFbPeriod').onclick=()=>{
   const cur=state.feedback&&state.feedback.start?`${state.feedback.start} ~ ${state.feedback.end}`:'';
   const txt=prompt('의견 수렴 기간을 입력하세요 (예: 2026-09-22 ~ 2026-09-30)\n빈칸으로 [확인]하면 수렴 기간을 해제합니다.',cur);
   if(txt===null)return;
-  if(!txt.trim()){state.feedback=null;render();toast('의견 수렴 기간 해제 — 게시해야 뷰어에 반영됩니다');return;}
+  if(!txt.trim()){state.feedback=null;render();toast('의견 수렴 기간 해제 — [시트에 반영]을 눌러야 뷰어에 적용됩니다');return;}
   const ds=txt.match(/\d{4}-\d{1,2}-\d{1,2}/g)||[];
   if(ds.length<2){alert('YYYY-MM-DD ~ YYYY-MM-DD 형식으로 시작일과 종료일을 입력해 주세요');return;}
   const norm=s=>{const[y,m,d]=s.split('-');return`${y}-${pad(+m)}-${pad(+d)}`;};
@@ -1828,7 +1828,7 @@ $('#btnFbPeriod').onclick=()=>{
   if(s>e)[s,e]=[e,s];
   state.feedback={start:s,end:e};
   render();
-  toast('의견 수렴 기간 설정됨 — 뷰어 [지금 게시] 또는 data.json 교체로 게시해야 적용됩니다');
+  toast('의견 수렴 기간 설정됨 — [시트에 반영]을 눌러야 뷰어에 적용됩니다');
 };
 const opFile=document.createElement('input');
 opFile.type='file';opFile.accept='.json,application/json';opFile.multiple=true;
