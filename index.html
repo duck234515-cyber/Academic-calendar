@@ -1182,7 +1182,7 @@ function openFbModal(){
         }
         throw new Error(res&&res.error||'unknown');
       }catch(e){
-        alert('전송하지 못했습니다. 잠시 후 다시 시도해 주세요.\n(계속 실패하면 담당 부서에 직접 연락해 주세요)');
+        alert('전송하지 못했습니다. 잠시 후 다시 시도해 주세요.\n(계속 실패하면 담당 부서에 직접 연락해 주세요)\n\n[진단] '+(e&&e.message?e.message:e));
         btn.disabled=false;renderItems();return;
       }
     }
@@ -1274,7 +1274,7 @@ async function loadReview(){
         await loadReview();
       }else if(res&&res.error==='bad_pw'){adminPwPlain=null;alert('스크립트의 관리자 비밀번호(ADMIN_PW)와 일치하지 않습니다. Apps Script의 ADMIN_PW 설정을 확인해 주세요.');}
       else{alert('처리하지 못했습니다: '+(res&&res.error||'알 수 없는 오류'));await loadReview();}
-    }catch(e){alert('처리하지 못했습니다 — 잠시 후 다시 시도해 주세요');await loadReview();}
+    }catch(e){alert('처리하지 못했습니다 — 잠시 후 다시 시도해 주세요\n\n[진단] '+(e&&e.message?e.message:e));await loadReview();}
   });
 }
 
