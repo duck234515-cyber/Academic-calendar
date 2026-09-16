@@ -634,6 +634,7 @@ window.AC_PW_HASH_P=(async function(){
   <button class="btn" id="btnShare"><svg class="icon" viewBox="0 0 24 24"><path d="M15 7a3 3 0 1 0 0-4 3 3 0 0 0 0 4zM6 14a3 3 0 1 0 0-4 3 3 0 0 0 0 4zm9 7a3 3 0 1 0 0-4 3 3 0 0 0 0 4zM8.6 10.5l4.8-2.7M8.6 13.5l4.8 2.7"/></svg>뷰어 공유 링크</button>
   <button class="btn" id="btnData"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v10m0 0l-3.5-3.5M12 13l3.5-3.5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>뷰어 데이터 저장</button>
   <button class="btn" id="btnImport" title="공유 링크·data.json 붙여넣기로 가져오기"><svg class="icon" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4l4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>가져오기</button>
+  <button class="btn" id="btnSheet" title="연동 구글시트의 현재 일정을 이 화면으로 불러오기"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>시트에서 불러오기</button>
   <button class="btn ghost" id="btnPw" title="관리자 비밀번호 변경"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5M12 14.5v2.5"/></svg>비밀번호</button>
   <a class="btn ghost" href="./" id="lnkViewer" title="열람 전용 페이지 열기"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/></svg>뷰어 열기</a>
 </header>
@@ -1856,6 +1857,85 @@ opFile.onchange=async()=>{
   toast(`의견 ${added}건 불러옴`+(skipped?` · 중복 ${skipped}건 제외`:'')+(bad?` · 인식 실패 파일 ${bad}개`:''));
 };
 
+/* ============================================================
+   구글시트에서 불러오기 : 연동 시트(뷰어와 동일)의 일정을 생성기 입력값으로.
+   새 브라우저(저장값 없음)에서는 자동으로 한 번 불러온다.
+   ============================================================ */
+const SHEET_ID='1QF-2WMBWpXuozLgWNqZZoFVPDWnX833Fzarfjhamg0c';
+function parseCSVg(txt){
+  const rows=[];let row=[],cur='',q=false;
+  for(let i=0;i<txt.length;i++){
+    const c=txt[i];
+    if(q){if(c==='"'){if(txt[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=c;}
+    else{
+      if(c==='"')q=true;
+      else if(c===','){row.push(cur);cur='';}
+      else if(c==='\n'){row.push(cur);rows.push(row);row=[];cur='';}
+      else if(c!=='\r')cur+=c;
+    }
+  }
+  if(cur!==''||row.length){row.push(cur);rows.push(row);}
+  return rows;
+}
+function normDateCellg(s){
+  s=String(s||'').trim();if(!s)return null;
+  let m=s.match(/^(\d{4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})\.?$/);
+  if(m)return `${m[1]}-${pad(+m[2])}-${pad(+m[3])}`;
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m)return `${m[3]}-${pad(+m[1])}-${pad(+m[2])}`;
+  return null;
+}
+function sheetRowsToState(rows){
+  const KIND={'휴업일':'off','휴업':'off','공휴일':'off','시험':'exam','보강':'makeup','행사':'event','학사':'admin',
+              'off':'off','exam':'exam','makeup':'makeup','event':'event','admin':'admin'};
+  const d={terms:{},user:{},targetWeeks:15};
+  let uid=1;
+  rows.forEach(r=>{
+    const t=String(r[0]||'').replace(/^﻿/,'').trim();
+    if(t==='학년도'){const y=+String(r[1]).trim();if(y>=2000&&y<=2100)d.year=y;}
+    else if(t==='표시학기')d.sem=+String(r[1]).trim()===2?2:1;
+    else if(t==='주차'){const w=+String(r[1]).trim();if(w>=10&&w<=20)d.targetWeeks=w;}
+    else if(t==='의견수렴'){
+      const s=normDateCellg(r[2]),e=normDateCellg(r[3]);
+      if(s&&e)d.feedback={start:s<=e?s:e,end:s<=e?e:s};
+    }else if(t==='학기'){
+      const k=String(r[1]||'').trim(),s=normDateCellg(r[2]),e=normDateCellg(r[3]);
+      if(/^\d{4}-[12]$/.test(k)&&s&&e)d.terms[k]={start:s,end:e};
+    }else if(t==='일정'){
+      const k=String(r[1]||'').trim(),s=normDateCellg(r[2]);let e=normDateCellg(r[3]);
+      const name=String(r[4]||'').trim(),kind=KIND[String(r[5]||'').trim()]||'admin';
+      if(!/^\d{4}-[12]$/.test(k)||!s||!name)return;
+      if(!e||e<s)e=s;
+      if(!d.user[k])d.user[k]=[];
+      d.user[k].push({id:uid++,iso:s,end:e,name,kind});
+    }
+  });
+  if(!d.year||!Object.keys(d.terms).length)return null;
+  d.uid=uid;
+  return d;
+}
+async function importFromSheet(silent){
+  if(!SHEET_ID)return false;
+  try{
+    const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&nc=${Date.now()}`,{cache:'no-store'});
+    if(!r.ok)throw 0;
+    const d=sheetRowsToState(parseCSVg(await r.text()));
+    if(!d)throw 0;
+    ['year','sem','terms','user','targetWeeks','uid','feedback'].forEach(k=>{if(d[k]!==undefined)state[k]=d[k];});
+    if(d.feedback===undefined)state.feedback=null;
+    render();
+    toast('구글시트의 학사일정을 불러왔습니다');
+    return true;
+  }catch(e){
+    if(!silent)toast('구글시트를 읽지 못했습니다 — 시트 공유(링크가 있는 모든 사용자) 설정을 확인해 주세요');
+    return false;
+  }
+}
+$('#btnSheet').onclick=()=>{
+  if(!confirm('연동 구글시트의 현재 일정으로 이 화면의 입력값을 덮어쓸까요?\n(시트가 최신 원본입니다 — 이 화면은 수업일수표 확인·인쇄용으로 사용하세요)'))return;
+  importFromSheet(false);
+};
+
 /* 고정 영역 위치: 툴바 실제 높이를 측정해 그 아래에 요약·사이드바를 붙임 */
 function setStickyTop(){
   const tb=document.querySelector('.toolbar');
@@ -1864,10 +1944,13 @@ function setStickyTop(){
 window.addEventListener('resize',setStickyTop);
 
 /* 초기 렌더 */
+const HAS_SAVED=!!localStorage.getItem(LS_KEY);
 loadState();
 render();
 setStickyTop();
 wireDatePickers();
+/* 이 브라우저에 저장된 입력값이 없으면(새 PC·새 브라우저) 시트에서 자동으로 불러오기 */
+if(!HAS_SAVED)importFromSheet(true);
 </script>
 </body>
 </html>
