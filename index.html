@@ -311,6 +311,7 @@
     <button data-view="list"><svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>전체 일정</button>
   </div>
   <button class="btnprint" onclick="window.print()"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg>인쇄</button>
+  <button class="btnprint" id="btnReviewTop" hidden title="부서에서 제출한 의견을 검토·반영합니다 (비밀번호 필요)">💬 의견 검토</button>
   <button class="btnprint" id="btnAdmin" title="비밀번호 필요"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>관리자</button>
 </div>
 
@@ -1057,6 +1058,8 @@ let fbItems=[];
 function setupFeedback(){
   const lnk=$('#lnkReview');
   if(lnk){lnk.hidden=!D.submitUrl;lnk.onclick=e=>{e.preventDefault();openReview();};}
+  const topBtn=$('#btnReviewTop');
+  if(topBtn){topBtn.hidden=!D.submitUrl;topBtn.onclick=()=>openReview();}
   const bar=$('#fbbar');
   const fb=D.feedback;
   if(!fb||!fb.start||!fb.end||todayISO<fb.start||todayISO>fb.end){bar.hidden=true;return;}
