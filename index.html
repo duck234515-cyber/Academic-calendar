@@ -233,6 +233,38 @@
   footer a{color:var(--brand);font-weight:700;text-decoration:none}
   footer a:hover{text-decoration:underline}
 
+  /* 부서 의견 제출 (의견 수렴 기간 중) */
+  .fbbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#fdf6e3;border:1.5px solid #e3cf8f;
+    border-radius:12px;padding:12px 16px;margin:0 0 14px;font-size:14px;line-height:1.5}
+  .fbbar b{color:#8a6d1a}
+  .fbbar button{margin-left:auto;border:0;border-radius:9px;background:var(--brand);color:#fff;
+    font:inherit;font-weight:700;padding:9px 16px;font-size:13.5px;cursor:pointer}
+  .fbbar button:hover{background:var(--brand-dark)}
+  .fbmodal{position:fixed;inset:0;background:rgba(15,23,36,.45);z-index:60;
+    display:flex;align-items:flex-start;justify-content:center;padding:28px 14px;overflow:auto}
+  .fbbox{background:var(--surface);border-radius:16px;max-width:580px;width:100%;
+    padding:22px 22px 18px;box-shadow:0 18px 50px rgba(0,0,0,.28)}
+  .fbbox h2{margin:0 0 4px;font-size:18px;display:flex;align-items:center;justify-content:space-between}
+  .fbbox h2 .fbclose{cursor:pointer;font-size:22px;font-weight:400;color:var(--faint);line-height:1}
+  .fbbox .sub{font-size:13px;color:var(--muted);margin:0 0 12px}
+  .fbbox label{display:block;font-size:12.5px;font-weight:700;color:var(--muted);margin:10px 0 4px}
+  .fbbox input[type=text],.fbbox input[type=date],.fbbox select,.fbbox textarea{width:100%;box-sizing:border-box;
+    border:1.5px solid var(--line-strong);border-radius:9px;padding:9px 10px;font:inherit;font-size:14px;
+    background:var(--surface);color:var(--text)}
+  .fbbox textarea{min-height:66px;resize:vertical}
+  .fbrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .fbitems{margin:14px 0 0;border-top:1px solid var(--line);padding-top:8px}
+  .fbitems .fih{font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:4px}
+  .fbitems .fi{display:flex;gap:8px;align-items:center;font-size:13px;padding:6px 0;border-bottom:1px dashed var(--line)}
+  .fbitems .fi .t{flex:1;line-height:1.4}
+  .fbitems .fi .rm{cursor:pointer;color:var(--hol);font-weight:700;padding:0 4px}
+  .fbbtns{display:flex;gap:10px;margin-top:16px}
+  .fbbtns button{flex:1;border:1.5px solid var(--line-strong);background:var(--surface);border-radius:10px;
+    padding:11px;font:inherit;font-size:14px;font-weight:700;cursor:pointer;color:var(--text)}
+  .fbbtns button:hover{background:var(--bg)}
+  .fbbtns button.pri{background:var(--brand);border-color:var(--brand);color:#fff}
+  .fbbtns button.pri:hover{background:var(--brand-dark)}
+  @media print{.fbbar,.fbmodal{display:none!important}}
   [hidden]{display:none!important}
 
   /* ---------- print ---------- */
@@ -275,6 +307,8 @@
   </div>
   <div class="srcline" id="srcline"></div>
   <div class="pubbar" id="pubbar" hidden></div>
+  <div class="fbbar" id="fbbar" hidden></div>
+  <div class="fbmodal" id="fbmodal" hidden></div>
 
   <div class="semcards" id="semcards"></div>
   <div class="upcoming" id="upcoming" hidden></div>
@@ -323,7 +357,7 @@ function embeddedData(){
 /* 비교·게시용 핵심 필드만 추출 (관리자 비밀번호 해시 포함 — 게시 시 함께 배포) */
 const coreOf=d=>({year:d.year,sem:d.sem,terms:d.terms||{},overrides:d.overrides||{},
                   user:d.user||{},targetWeeks:d.targetWeeks||15,adminPwHash:d.adminPwHash||'',
-                  lockYear:d.lockYear!==false});
+                  lockYear:d.lockYear!==false,feedback:d.feedback||null});
 async function loadData(){
   const fromHash=decodeShare();
   if(fromHash)return{d:fromHash,src:'공유 링크에 담긴 데이터',hash:true};
@@ -804,6 +838,131 @@ function render(){
 }
 
 /* ============================================================
+   3.5 부서 의견 제출 : 게시 데이터의 feedback(의견 수렴 기간) 중에만 표시
+      서버 없이 동작 — 작성한 의견을 JSON 파일로 저장해 담당자에게 전달하면
+      관리자가 생성기의 [의견 파일 불러오기]로 검토·반영합니다
+   ============================================================ */
+const escFb=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let fbItems=[];
+function setupFeedback(){
+  const bar=$('#fbbar');
+  const fb=D.feedback;
+  if(!fb||!fb.start||!fb.end||todayISO<fb.start||todayISO>fb.end){bar.hidden=true;return;}
+  bar.hidden=false;
+  bar.innerHTML=`<span>📢 <b>학사일정 의견 수렴 기간</b>입니다 (${fb.start} ~ ${fb.end}) — 부서명을 적어 일정 수정 의견을 보내주세요.</span>
+    <button id="btnFbOpen">의견 제출하기</button>`;
+  $('#btnFbOpen').onclick=openFbModal;
+}
+function fbTargets(term){return ((D.user||{})[term]||[]).slice().sort((a,b)=>a.iso<b.iso?-1:1);}
+function openFbModal(){
+  const m=$('#fbmodal');
+  let dept='';try{dept=localStorage.getItem('ac_fb_dept')||'';}catch(e){}
+  const y=D.year||V.year;
+  m.hidden=false;
+  m.innerHTML=`<div class="fbbox">
+    <h2>학사일정 수정 의견 제출 <span class="fbclose" title="닫기">×</span></h2>
+    <p class="sub">의견을 목록에 담은 뒤 <b>[의견 파일 저장]</b>을 누르면 JSON 파일이 내려받아집니다. 이 파일을 <b>이메일·메신저로 학사일정 담당 부서에</b> 보내주시면 검토 후 반영됩니다.</p>
+    <label>부서명 <em>(필수)</em></label>
+    <input type="text" id="fbDept" placeholder="예: 교무처 학사지원팀" value="${escFb(dept)}">
+    <div class="fbrow">
+      <div><label>대상 학기</label><select id="fbTerm">
+        ${[1,2].map(s=>`<option value="${y}-${s}"${D.sem===s?' selected':''}>${y}학년도 ${s}학기</option>`).join('')}
+      </select></div>
+      <div><label>의견 구분</label><select id="fbType">
+        <option value="edit">기존 일정 수정</option>
+        <option value="add">일정 추가 요청</option>
+        <option value="del">일정 삭제 요청</option>
+        <option value="etc">기타 의견</option></select></div>
+    </div>
+    <div id="fbTargetWrap"><label>대상 일정</label><select id="fbTarget"></select></div>
+    <div id="fbNameWrap"><label id="fbNameLbl"></label><input type="text" id="fbName" placeholder="예: 중간고사"></div>
+    <div id="fbKindWrap"><label>분류</label><select id="fbKind">
+      <option value="admin">학사</option><option value="off">휴업일</option>
+      <option value="exam">시험</option><option value="makeup">보강</option><option value="event">행사</option></select></div>
+    <div class="fbrow" id="fbDateWrap">
+      <div><label id="fbStartLbl"></label><input type="date" id="fbStart"></div>
+      <div><label>제안 종료일 <em>(선택)</em></label><input type="date" id="fbEnd"></div>
+    </div>
+    <label id="fbNoteLbl"></label>
+    <textarea id="fbNote" placeholder="예: 부서 행사와 겹쳐 일정 조정을 요청합니다"></textarea>
+    <div class="fbbtns"><button id="fbAdd">＋ 목록에 담기</button></div>
+    <div class="fbitems" id="fbList"></div>
+    <div class="fbbtns">
+      <button id="fbCancel">닫기</button>
+      <button class="pri" id="fbSave">의견 파일 저장 (0건)</button>
+    </div>
+  </div>`;
+  const close=()=>{m.hidden=true;};
+  m.querySelector('.fbclose').onclick=close;
+  $('#fbCancel').onclick=close;
+  m.onclick=e=>{if(e.target===m)close();};
+  const refreshTargets=()=>{
+    const ts=fbTargets($('#fbTerm').value);
+    $('#fbTarget').innerHTML=ts.length
+      ?ts.map(u=>`<option value="${u.id}">${escFb(u.name)} (${u.iso}${u.end&&u.end!==u.iso?'~'+u.end:''})</option>`).join('')
+      :'<option value="">이 학기에 등록된 일정이 없습니다</option>';
+  };
+  const refreshType=()=>{
+    const t=$('#fbType').value;
+    $('#fbTargetWrap').hidden=!(t==='edit'||t==='del');
+    $('#fbNameWrap').hidden=!(t==='edit'||t==='add');
+    $('#fbKindWrap').hidden=t!=='add';
+    $('#fbDateWrap').hidden=!(t==='edit'||t==='add');
+    $('#fbNameLbl').innerHTML=t==='add'?'일정 명칭 <em>(필수)</em>':'변경 명칭 <em>(선택 — 비우면 유지)</em>';
+    $('#fbStartLbl').innerHTML=t==='add'?'시작일 <em>(필수)</em>':'제안 시작일 <em>(선택)</em>';
+    $('#fbNoteLbl').innerHTML=t==='etc'?'의견 내용 <em>(필수)</em>':'의견 내용 <em>(사유 등, 선택)</em>';
+  };
+  $('#fbTerm').onchange=refreshTargets;
+  $('#fbType').onchange=refreshType;
+  refreshTargets();refreshType();
+  const renderItems=()=>{
+    const list=$('#fbList');
+    list.innerHTML=fbItems.length?'<div class="fih">담긴 의견</div>':'';
+    fbItems.forEach((it,i)=>{
+      const el=document.createElement('div');el.className='fi';
+      const range=it.iso?(it.iso+(it.end&&it.end!==it.iso?'~'+it.end:'')):'';
+      let t='';
+      if(it.type==='add')t=`[추가] ${escFb(it.name)} · ${range}`;
+      else if(it.type==='edit')t=`[수정] '${escFb(it.targetName)}' → ${it.name?escFb(it.name):'(명칭 유지)'}${range?' · '+range:''}`;
+      else if(it.type==='del')t=`[삭제] '${escFb(it.targetName)}'`;
+      else t=`[의견] ${escFb(it.note)}`;
+      el.innerHTML=`<span class="t">${t}</span><span class="rm" data-i="${i}" title="빼기">×</span>`;
+      list.appendChild(el);
+    });
+    list.querySelectorAll('.rm').forEach(x=>x.onclick=()=>{fbItems.splice(+x.dataset.i,1);renderItems();});
+    $('#fbSave').textContent=`의견 파일 저장 (${fbItems.length}건)`;
+  };
+  renderItems();
+  $('#fbAdd').onclick=()=>{
+    const type=$('#fbType').value,term=$('#fbTerm').value;
+    const name=$('#fbName').value.trim(),iso=$('#fbStart').value,end=$('#fbEnd').value,note=$('#fbNote').value.trim();
+    const targetId=$('#fbTarget').value?+$('#fbTarget').value:null;
+    const tObj=fbTargets(term).find(u=>u.id===targetId);
+    if(type==='add'&&(!name||!iso)){alert('추가 요청은 일정 명칭과 시작일이 필요합니다');return;}
+    if((type==='edit'||type==='del')&&!tObj){alert('대상 일정을 선택해 주세요');return;}
+    if(type==='edit'&&!name&&!iso&&!end&&!note){alert('변경할 내용(명칭·날짜)이나 의견을 입력해 주세요');return;}
+    if(type==='etc'&&!note){alert('의견 내용을 입력해 주세요');return;}
+    fbItems.push({term,type,targetId:tObj?tObj.id:null,targetName:tObj?tObj.name:'',
+                  name,iso,end:end||iso,kind:type==='add'?$('#fbKind').value:'',note});
+    $('#fbName').value='';$('#fbStart').value='';$('#fbEnd').value='';$('#fbNote').value='';
+    renderItems();
+  };
+  $('#fbSave').onclick=()=>{
+    const dv=$('#fbDept').value.trim();
+    if(!dv){alert('부서명을 입력해 주세요');$('#fbDept').focus();return;}
+    if(!fbItems.length){alert('담긴 의견이 없습니다 — [목록에 담기]로 먼저 추가해 주세요');return;}
+    try{localStorage.setItem('ac_fb_dept',dv);}catch(e){}
+    const out={app:'academic_calendar_feedback',ver:1,dept:dv,submittedAt:todayISO,items:fbItems};
+    const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download=`학사일정_의견_${dv}_${todayISO}.json`;a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    alert('의견 파일이 저장되었습니다.\n\n저장된 파일을 이메일·메신저로 학사일정 담당 부서에 보내주시면, 검토 후 학사일정에 반영됩니다.');
+    fbItems=[];m.hidden=true;
+  };
+}
+
+/* ============================================================
    4. 이벤트 + 초기화
    ============================================================ */
 /* 관리자 진입 : 비밀번호 확인 후 생성기로 이동 (탭이 열려 있는 동안 유지)
@@ -835,7 +994,7 @@ document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{V.view=b.dat
 $('#ySel').onchange=e=>{V.year=+e.target.value;render();};
 $('#yPrev').onclick=()=>{if(V.year>YEARS[0]){V.year--;render();}};
 $('#yNext').onclick=()=>{if(V.year<YEARS[YEARS.length-1]){V.year++;render();}};
-window.addEventListener('hashchange',()=>{const d=decodeShare();if(d){D=d;if(D.year)V.year=D.year;$('#srcline').innerHTML=srcLine('공유 링크에 담긴 데이터');render();setupPublish(d);}});
+window.addEventListener('hashchange',()=>{const d=decodeShare();if(d){D=d;if(D.year)V.year=D.year;$('#srcline').innerHTML=srcLine('공유 링크에 담긴 데이터');render();setupPublish(d);setupFeedback();}});
 
 function srcLine(src){
   const upd=D.updated?` · 마지막 수정 <b>${D.updated}</b>`:'';
@@ -905,6 +1064,7 @@ async function setupPublish(hashData){
   $('#srcline').innerHTML=srcLine(src);
   render();
   setupPublish(hash?d:null);
+  setupFeedback();
 })();
 </script>
 </body>
