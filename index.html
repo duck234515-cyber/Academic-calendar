@@ -445,15 +445,60 @@ function sheetToData(rows){
   if(!d.year||!Object.keys(d.terms).length)return null;
   return d;
 }
+/* gviz JSON 결과를 행 배열로 변환 (날짜 셀 Date(y,m,d)는 ISO로) */
+function gvizRowsFromJson(json){
+  const rows=[];const t=json&&json.table;if(!t)return rows;
+  // gviz가 머리글로 흡수한 1행을 복원 (CSV 경로와 행 번호를 맞추기 위해)
+  const labels=(t.cols||[]).map(c=>c&&c.label?String(c.label):'');
+  if(labels.some(x=>x.trim()))rows.push(labels);
+  (t.rows||[]).forEach(r=>{
+    rows.push((r.c||[]).map(c=>{
+      if(!c)return'';
+      let v=(c.f!==undefined&&c.f!==null)?c.f:c.v;
+      if(v==null)return'';
+      const m=String(v).match(/^Date\((\d+),(\d+),(\d+)/);
+      if(m)return `${m[1]}-${pad(+m[2]+1)}-${pad(+m[3])}`;
+      return String(v);
+    }));
+  });
+  return rows;
+}
+/* CORS가 막힌 환경용 예비 경로 : gviz JSONP(script 태그)로 시트 읽기 */
+function loadSheetJsonp(sheetName){
+  return new Promise((resolve,reject)=>{
+    const cb='__gviz_cb_'+Math.random().toString(36).slice(2);
+    const s=document.createElement('script');
+    const to=setTimeout(()=>{cleanup();reject(new Error('timeout'));},8000);
+    function cleanup(){clearTimeout(to);try{delete window[cb];}catch(e){}s.remove();}
+    window[cb]=res=>{
+      cleanup();
+      if(!res||res.status==='error')reject(new Error('gviz_error'));
+      else resolve(gvizRowsFromJson(res));
+    };
+    s.onerror=()=>{cleanup();reject(new Error('load_error'));};
+    s.src=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}`+
+          (sheetName?`&sheet=${encodeURIComponent(sheetName)}`:'')+`&nc=${Date.now()}`;
+    document.head.appendChild(s);
+  });
+}
+/* 시트 행 읽기 : ① fetch CSV → 실패 시 ② JSONP */
+async function fetchSheetRows(sheetName){
+  try{
+    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),8000);
+    const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`+
+                        (sheetName?`&sheet=${encodeURIComponent(sheetName)}`:'')+`&nc=${Date.now()}`,
+                        {signal:ctl.signal,cache:'no-store'});
+    clearTimeout(to);
+    if(!r.ok)throw new Error('http_'+r.status);
+    return parseCSV(await r.text());
+  }catch(e){
+    return await loadSheetJsonp(sheetName);   // CORS 등으로 fetch가 막히면 JSONP로 재시도
+  }
+}
 async function loadSheet(){
   if(!SHEET_ID)return null;
   try{
-    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),8000);
-    const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&nc=${Date.now()}`,
-                        {signal:ctl.signal,cache:'no-store'});
-    clearTimeout(to);
-    if(!r.ok)return null;
-    return sheetToData(parseCSV(await r.text()));
+    return sheetToData(await fetchSheetRows(''));
   }catch(e){return null;}
 }
 async function loadData(){
@@ -469,16 +514,18 @@ async function loadData(){
     }
     return{d:sheet,src:'구글시트 연동 데이터 (실시간)'};
   }
+  // 시트를 읽지 못함 — 어떤 대체 데이터로 표시 중인지 출처에 명시
+  const fail=SHEET_ID?' · ⚠ 구글시트를 읽지 못해 저장본으로 표시 중 — 시트 공유(링크가 있는 모든 사용자) 설정을 확인하세요':'';
   const ls=readLS(),emb=embeddedData();
   if(ls&&emb&&JSON.stringify(coreOf(ls))===JSON.stringify(coreOf(emb)))
-    return{d:emb,src:'게시된 데이터 (최신)'};
-  if(ls)return{d:ls,src:'이 브라우저의 생성기 입력값 (실시간 연동)'};
-  if(emb)return{d:emb,src:'게시된 데이터'};
+    return{d:emb,src:'게시된 데이터 (최신)'+fail};
+  if(ls)return{d:ls,src:'이 브라우저의 생성기 입력값 (실시간 연동)'+fail};
+  if(emb)return{d:emb,src:'게시된 데이터'+fail};
   try{
     const r=await fetch('data.json',{cache:'no-store'});
-    if(r.ok){const j=await r.json();if(j&&j.terms)return{d:j,src:'게시된 데이터(data.json)'};}
+    if(r.ok){const j=await r.json();if(j&&j.terms)return{d:j,src:'게시된 데이터(data.json)'+fail};}
   }catch(e){}
-  return{d:DEFAULT_DATA,src:'기본값 (입력된 데이터 없음)'};
+  return{d:DEFAULT_DATA,src:'기본값 (입력된 데이터 없음)'+fail};
 }
 
 /* ============================================================
@@ -1158,9 +1205,7 @@ async function loadReview(){
   box.textContent='불러오는 중…';
   let rows;
   try{
-    const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('의견')}&nc=${Date.now()}`,{cache:'no-store'});
-    if(!r.ok)throw 0;
-    rows=parseCSV(await r.text());
+    rows=await fetchSheetRows('의견');
   }catch(e){box.textContent='의견 목록을 읽지 못했습니다 — 아직 제출된 의견이 없거나 시트 공유 설정을 확인해 주세요';return;}
   // 열: 0제출일시 1부서명 2학기 3구분 4대상일정 5대상시작일 6제안명칭 7제안시작일 8제안종료일 9분류 10의견 11상태
   const pend=[];
