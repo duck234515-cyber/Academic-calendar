@@ -744,6 +744,24 @@ window.AC_PW_HASH_P=(async function(){
         <div class="itemlist" id="userList"></div>
       </div>
     </section>
+
+    <section class="card">
+      <div class="hd">
+        <svg class="icon" style="font-size:16px;color:var(--accent)" viewBox="0 0 24 24"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.9 8.9 0 0 1-3.9-.9L3 20l1-4.6a8.4 8.4 0 1 1 17-3.9z"/><path d="M8 10.5h8M8 13.5h5"/></svg>
+        <h2>부서 의견 수렴</h2>
+        <span class="count" id="opCount">0</span>
+      </div>
+      <div class="bd">
+        <p class="hint" id="fbPeriodLine" style="margin-top:0;margin-bottom:10px"></p>
+        <div style="display:flex;gap:8px;margin-bottom:10px">
+          <button class="btn" id="btnFbPeriod" style="flex:1;justify-content:center">기간 설정</button>
+          <button class="btn" id="btnOpLoad" style="flex:1;justify-content:center">의견 파일 불러오기</button>
+        </div>
+        <p class="hint" style="margin:0 0 10px">기간을 설정하고 <b>게시</b>(뷰어 [지금 게시] 또는 data.json 교체)하면, 기간 중 뷰어에 <b>[의견 제출]</b> 버튼이 나타납니다. 각 부서가 저장해 보낸 의견 파일(.json)을 불러와 아래에서 건별로 <b>반영</b>하세요.</p>
+        <style>#opList .nm{white-space:normal;overflow:visible;text-overflow:unset;line-height:1.4}</style>
+        <div class="itemlist" id="opList"></div>
+      </div>
+    </section>
   </aside>
 
   <!-- MAIN -->
@@ -857,6 +875,8 @@ const state={
   targetWeeks:15,           // 휴일 제외 목표 수업 주차 (요일별)
   uid:1,
   lockYear:true,            // 뷰어에 현재 학년도만 표시 (false = 전체 연도 열람 허용)
+  feedback:null,            // 의견 수렴 기간 {start,end} — 게시하면 뷰어에 [의견 제출] 표시
+  opinions:[],              // 부서가 보낸 의견 파일에서 불러온 항목 (생성기 로컬 전용)
 };
 
 /* ===== 자동 저장 (브라우저 localStorage, 백엔드 불필요) ===== */
@@ -867,7 +887,8 @@ function saveState(){
       year:state.year, sem:state.sem, terms:state.terms,
       overrides:state.overrides, user:state.user,
       targetWeeks:state.targetWeeks, uid:state.uid,
-      adminPwHash:state.adminPwHash, lockYear:state.lockYear
+      adminPwHash:state.adminPwHash, lockYear:state.lockYear,
+      feedback:state.feedback, opinions:state.opinions
     }));
   }catch(e){}
 }
@@ -875,7 +896,7 @@ function loadState(){
   try{
     const raw=localStorage.getItem(LS_KEY); if(!raw)return;
     const d=JSON.parse(raw);
-    ['year','sem','terms','overrides','user','targetWeeks','uid','adminPwHash','lockYear'].forEach(k=>{ if(d[k]!==undefined)state[k]=d[k]; });
+    ['year','sem','terms','overrides','user','targetWeeks','uid','adminPwHash','lockYear','feedback','opinions'].forEach(k=>{ if(d[k]!==undefined)state[k]=d[k]; });
   }catch(e){}
 }
 
@@ -1355,6 +1376,7 @@ function render(){
   renderControls();
   const data=compute();
   renderSidebar(data);
+  renderOpinions();
   if(!data.valid){
     $('#summary').innerHTML='<div class="stat" style="grid-column:1/-1;color:var(--sun)">개강일이 종강일보다 늦습니다. 날짜를 확인해 주세요.</div>';
     $('#weekcheck').className='';$('#weekcheck').innerHTML='';
@@ -1628,7 +1650,7 @@ $('#btnXls').onclick=()=>{
 function exportViewerData(){
   const d={updated:toISO(new Date()),year:state.year,sem:state.sem,terms:state.terms,
            overrides:state.overrides,user:state.user,targetWeeks:state.targetWeeks,
-           lockYear:state.lockYear!==false};
+           lockYear:state.lockYear!==false,feedback:state.feedback||null};
   if(state.adminPwHash)d.adminPwHash=state.adminPwHash;
   return d;
 }
@@ -1649,7 +1671,7 @@ function parseImport(txt){
 }
 function applyImport(d){
   if(!confirm('가져온 데이터로 현재 입력값을 덮어쓸까요?\n(학년도·학기·개강종강일·일정·공휴일 설정이 모두 교체됩니다)'))return;
-  ['year','sem','terms','overrides','user','targetWeeks','adminPwHash','lockYear'].forEach(k=>{if(d[k]!==undefined)state[k]=d[k];});
+  ['year','sem','terms','overrides','user','targetWeeks','adminPwHash','lockYear','feedback'].forEach(k=>{if(d[k]!==undefined)state[k]=d[k];});
   let mx=0;Object.values(state.user||{}).forEach(a=>(a||[]).forEach(u=>{if(+u.id>mx)mx=+u.id;}));
   state.uid=mx+1;
   render();
@@ -1718,6 +1740,121 @@ $('#btnData').onclick=()=>{
   toast('data.json 저장됨 — 뷰어와 같은 폴더(저장소)에 올리면 모두에게 반영됩니다');
 };
 (()=>{const a=document.getElementById('lnkViewer');if(a)a.href=viewerURL();})();
+
+/* ============================================================
+   부서 의견 수렴 : 기간 설정(게시 데이터에 포함) + 의견 파일 검토·반영
+   - 뷰어에서 각 부서가 저장한 의견 파일({app:'academic_calendar_feedback'})을
+     불러와 목록으로 보여주고, 추가/수정/삭제 제안은 [반영] 한 번으로 적용
+   ============================================================ */
+const escOp=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function renderOpinions(){
+  const box=$('#opList'),line=$('#fbPeriodLine');
+  if(!box||!line)return;
+  line.innerHTML=state.feedback&&state.feedback.start
+    ?`의견 수렴 기간 : <b>${state.feedback.start} ~ ${state.feedback.end}</b> <em>(게시해야 뷰어에 적용)</em>`
+    :'의견 수렴 기간이 <b>설정되지 않았습니다</b>';
+  const ops=state.opinions||[];
+  $('#opCount').textContent=ops.filter(o=>o.status!=='done').length;
+  box.innerHTML='';
+  if(!ops.length){box.innerHTML='<div class="empty">불러온 의견이 없습니다</div>';return;}
+  const typeDot={add:'#1b7a1b',edit:'#0b6e8f',del:'#E51400',etc:'#44546a'};
+  const typeLbl={add:'추가',edit:'수정',del:'삭제',etc:'의견'};
+  ops.forEach(o=>{
+    const el=document.createElement('div');el.className='item';
+    if(o.status==='done')el.style.opacity='.45';
+    const range=o.iso?(o.iso+(o.end&&o.end!==o.iso?'~'+o.end:'')):'';
+    let desc='';
+    if(o.type==='add')desc=`${escOp(o.name)} · ${range}`;
+    else if(o.type==='edit')desc=`'${escOp(o.targetName)}' → ${o.name?escOp(o.name):'(명칭 유지)'}${range?' · '+range:''}`;
+    else if(o.type==='del')desc=`'${escOp(o.targetName)}' 삭제 요청`;
+    else desc=escOp(o.note);
+    const noteLine=(o.type!=='etc'&&o.note)?`<div class="dt">"${escOp(o.note)}"</div>`:'';
+    el.innerHTML=`
+      <span class="dot" style="background:${typeDot[o.type]||'#888'}"></span>
+      <div class="meta"><div class="nm">[${escOp(o.dept||'무기명')}·${typeLbl[o.type]||''}] ${desc}</div>
+        <div class="dt">${escOp(o.term||'')} 학기 · ${escOp(o.submittedAt||'')} 제출</div>${noteLine}</div>
+      ${o.status==='done'
+        ?'<span class="tag admin">처리됨</span>'
+        :(o.type!=='etc'?`<button class="btn" style="padding:3px 9px;font-size:12px" data-ap="${o.oid}">반영</button>`:'')}
+      ${o.status!=='done'?`<span class="tag" style="cursor:pointer" data-dn="${o.oid}" title="반영 없이 처리 완료로 표시">완료</span>`:''}
+      <div class="x" data-rm="${o.oid}" title="목록에서 삭제"><svg class="icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></div>`;
+    box.appendChild(el);
+  });
+  box.querySelectorAll('[data-ap]').forEach(b=>b.onclick=()=>{
+    const o=ops.find(x=>x.oid===+b.dataset.ap);if(!o)return;
+    if(applyOpinion(o)){o.status='done';render();toast('일정에 반영했습니다 — 내용 확인 후 게시하세요');}
+  });
+  box.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>{
+    const o=ops.find(x=>x.oid===+b.dataset.dn);if(!o)return;
+    o.status='done';render();
+  });
+  box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{
+    state.opinions=ops.filter(x=>x.oid!==+b.dataset.rm);render();
+  });
+}
+function applyOpinion(o){
+  const k=o.term;
+  if(!k){alert('의견에 학기 정보가 없어 자동 반영할 수 없습니다');return false;}
+  if(o.type==='add'){
+    if(!o.name||!o.iso){alert('명칭·날짜가 없어 자동 반영할 수 없습니다 — 내용을 보고 직접 추가해 주세요');return false;}
+    if(!state.user[k])state.user[k]=[];
+    state.user[k].push({id:state.uid++,iso:o.iso,end:o.end||o.iso,name:o.name,kind:o.kind||'admin'});
+    return true;
+  }
+  const arr=state.user[k]||[];
+  const t=arr.find(u=>u.id===o.targetId);
+  if(!t){alert('대상 일정을 찾지 못했습니다 (이미 삭제되었거나 변경됨) — 목록을 보고 직접 처리해 주세요');return false;}
+  if(o.type==='del'){state.user[k]=arr.filter(u=>u.id!==o.targetId);return true;}
+  if(o.type==='edit'){
+    if(o.name)t.name=o.name;
+    if(o.iso){t.iso=o.iso;t.end=o.end||o.iso;}
+    else if(o.end)t.end=o.end;
+    return true;
+  }
+  return false;
+}
+$('#btnFbPeriod').onclick=()=>{
+  const cur=state.feedback&&state.feedback.start?`${state.feedback.start} ~ ${state.feedback.end}`:'';
+  const txt=prompt('의견 수렴 기간을 입력하세요 (예: 2026-09-22 ~ 2026-09-30)\n빈칸으로 [확인]하면 수렴 기간을 해제합니다.',cur);
+  if(txt===null)return;
+  if(!txt.trim()){state.feedback=null;render();toast('의견 수렴 기간 해제 — 게시해야 뷰어에 반영됩니다');return;}
+  const ds=txt.match(/\d{4}-\d{1,2}-\d{1,2}/g)||[];
+  if(ds.length<2){alert('YYYY-MM-DD ~ YYYY-MM-DD 형식으로 시작일과 종료일을 입력해 주세요');return;}
+  const norm=s=>{const[y,m,d]=s.split('-');return`${y}-${pad(+m)}-${pad(+d)}`;};
+  let s=norm(ds[0]),e=norm(ds[1]);
+  if(s>e)[s,e]=[e,s];
+  state.feedback={start:s,end:e};
+  render();
+  toast('의견 수렴 기간 설정됨 — 뷰어 [지금 게시] 또는 data.json 교체로 게시해야 적용됩니다');
+};
+const opFile=document.createElement('input');
+opFile.type='file';opFile.accept='.json,application/json';opFile.multiple=true;
+opFile.style.display='none';document.body.appendChild(opFile);
+$('#btnOpLoad').onclick=()=>{opFile.value='';opFile.click();};
+opFile.onchange=async()=>{
+  const files=[...(opFile.files||[])];
+  if(!files.length)return;
+  let added=0,skipped=0,bad=0;
+  const keyOf=o=>[o.dept,o.term,o.type,o.targetId,o.name,o.iso,o.end,o.note].join('|');
+  const seen=new Set((state.opinions||[]).map(keyOf));
+  let oid=(state.opinions||[]).reduce((m,o)=>Math.max(m,+o.oid||0),0);
+  for(const f of files){
+    try{
+      const j=JSON.parse(await f.text());
+      if(!j||j.app!=='academic_calendar_feedback'||!Array.isArray(j.items))throw 0;
+      j.items.forEach(it=>{
+        const o={oid:++oid,dept:j.dept||'',submittedAt:j.submittedAt||'',term:it.term||'',
+                 type:it.type||'etc',targetId:it.targetId??null,targetName:it.targetName||'',
+                 name:it.name||'',iso:it.iso||'',end:it.end||'',kind:it.kind||'',note:it.note||'',status:'todo'};
+        const key=keyOf(o);
+        if(seen.has(key)){skipped++;return;}
+        seen.add(key);state.opinions.push(o);added++;
+      });
+    }catch(e){bad++;}
+  }
+  render();
+  toast(`의견 ${added}건 불러옴`+(skipped?` · 중복 ${skipped}건 제외`:'')+(bad?` · 인식 실패 파일 ${bad}개`:''));
+};
 
 /* 고정 영역 위치: 툴바 실제 높이를 측정해 그 아래에 요약·사이드바를 붙임 */
 function setStickyTop(){
