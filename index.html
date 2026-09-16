@@ -424,6 +424,9 @@ function sheetToData(rows){
     }else if(t==='제출주소'){
       const u=String(r[1]||'').trim();
       if(/^https:\/\/script\.google(usercontent)?\.com\//.test(u))d.submitUrl=u;
+    }else if(t==='비밀번호해시'){
+      const h=String(r[1]||'').trim().toLowerCase();
+      if(/^[0-9a-f]{64}$/.test(h))d.adminPwHash=h;   // 관리자 비밀번호(SHA-256) — 모든 기기에 적용
     }else if(t==='학기'){
       const k=String(r[1]||'').trim(),s=normDateCell(r[2]),e=normDateCell(r[3]);
       if(/^\d{4}-[12]$/.test(k)&&s&&e)d.terms[k]={start:s,end:e};
@@ -455,8 +458,8 @@ async function loadData(){
   if(fromHash)return{d:fromHash,src:'공유 링크에 담긴 데이터',hash:true};
   const sheet=await loadSheet();
   if(sheet){
-    // 관리자 비밀번호 해시는 시트에 없으므로 게시본·data.json 값으로 보충
-    try{const emb=embeddedData();if(emb&&emb.adminPwHash)sheet.adminPwHash=emb.adminPwHash;}catch(e){}
+    // 비밀번호해시 행이 시트에 없으면 게시본·data.json 값으로 보충
+    if(!sheet.adminPwHash){try{const emb=embeddedData();if(emb&&emb.adminPwHash)sheet.adminPwHash=emb.adminPwHash;}catch(e){}}
     if(!sheet.adminPwHash){
       try{const r=await fetch('data.json',{cache:'no-store'});
         if(r.ok){const j=await r.json();if(j&&j.adminPwHash)sheet.adminPwHash=j.adminPwHash;}}catch(e){}
