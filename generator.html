@@ -1633,12 +1633,18 @@ function exportViewerData(){
   return d;
 }
 /* ---- 데이터 가져오기 : 공유 링크 또는 data.json 내용 붙여넣기 ---- */
+function unwrapImport(j){
+  if(!j)return null;
+  if(j.terms)return j;                       // data.json / 공유 링크 형식
+  if(j.data&&j.data.terms)return j.data;     // 예전 백업 형식 {app,ver,exportedAt,data:{...}}
+  return null;
+}
 function parseImport(txt){
   txt=String(txt).trim();
-  if(txt.startsWith('{')){try{const j=JSON.parse(txt);if(j&&j.terms)return j;}catch(e){}}
+  if(txt.startsWith('{')){try{const d=unwrapImport(JSON.parse(txt));if(d)return d;}catch(e){}}
   const m=txt.match(/[#&]d=([^&\s]+)/);
   const b64=m?m[1]:txt;
-  try{const j=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(b64)))));if(j&&j.terms)return j;}catch(e){}
+  try{const d=unwrapImport(JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(b64))))));if(d)return d;}catch(e){}
   return null;
 }
 function applyImport(d){
