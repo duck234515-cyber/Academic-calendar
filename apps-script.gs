@@ -12,6 +12,10 @@
       시트에 행을 하나 추가: A열 `제출주소`, B열에 URL 붙여넣기
    → 이후 뷰어의 [의견 제출]은 파일 저장 없이 바로 전송되고,
      관리자는 뷰어의 [의견 검토]에서 [반영] 클릭으로 시트를 수정합니다.
+     생성기의 [시트에 반영] 버튼도 이 스크립트를 통해 동작합니다.
+
+   ★ 이 파일을 수정한 뒤에는: [배포] → [배포 관리] → 연필(수정)
+     → 버전: 새 버전 → [배포] 를 해야 반영됩니다 (URL은 그대로 유지).
    ============================================================ */
 
 var ADMIN_PW = 'CHANGE-ME';   // ★ 사이트 관리자 비밀번호와 동일하게 변경하세요
@@ -22,9 +26,11 @@ function doPost(e) {
   try {
     var req = JSON.parse(e.postData.contents);
     if (req.action === 'submit') out = submitOpinions(req);
-    else if (req.action === 'apply' || req.action === 'close') {
+    else if (req.action === 'apply' || req.action === 'close' || req.action === 'replace') {
       if (String(req.pw || '') !== ADMIN_PW) out = { ok: false, error: 'bad_pw' };
-      else out = req.action === 'apply' ? applyOpinion(req) : closeOpinion(req);
+      else out = req.action === 'apply' ? applyOpinion(req)
+           : req.action === 'replace' ? replaceData(req)
+           : closeOpinion(req);
     } else out = { ok: false, error: 'bad_action' };
   } catch (err) {
     out = { ok: false, error: String(err) };
@@ -121,6 +127,48 @@ function applyOpinion(req) {
     }
     op.sheet.getRange(op.row, 12).setValue('반영됨');
     return { ok: true };
+  } finally { lock.releaseLock(); }
+}
+
+/* [시트에 반영] : 생성기의 현재 입력값(req.data)으로 일정 데이터 탭을 다시 씀
+   — 메모·제출주소·비밀번호해시 행은 그대로 보존 */
+function replaceData(req) {
+  var lock = LockService.getScriptLock(); lock.waitLock(10000);
+  try {
+    var d = req.data || {};
+    if (!d.year || !d.terms || !Object.keys(d.terms).length)
+      return { ok: false, error: 'bad_data' };
+    var s = dataSheet();
+    var keep = [];
+    s.getDataRange().getValues().forEach(function (r) {
+      var t = String(r[0] || '').trim();
+      if (t === '메모' || t === '제출주소' || t === '비밀번호해시') keep.push(r.slice(0, 6));
+    });
+    var KIND_KO = { off: '휴업일', exam: '시험', makeup: '보강', event: '행사', admin: '학사' };
+    var rows = [['종류', '학기', '시작일', '종료일', '명칭', '분류']];
+    rows.push(['학년도', String(d.year), '', '', '', '']);
+    rows.push(['표시학기', String(+d.sem === 2 ? 2 : 1), '', '', '', '']);
+    rows.push(['주차', String(d.targetWeeks || 15), '', '', '', '']);
+    var fb = d.feedback || {};
+    rows.push(['의견수렴', '', fb.start || '', fb.end || '', '', '']);
+    rows.push(['연도잠금', d.lockYear === false ? '0' : '1', '', '', '', '']);
+    Object.keys(d.terms).sort().forEach(function (k) {
+      var t = d.terms[k] || {};
+      if (/^\d{4}-[12]$/.test(k) && t.start && t.end) rows.push(['학기', k, t.start, t.end, '', '']);
+    });
+    Object.keys(d.user || {}).sort().forEach(function (k) {
+      if (!/^\d{4}-[12]$/.test(k)) return;
+      (d.user[k] || []).forEach(function (u) {
+        if (!u || !u.iso || !u.name) return;
+        rows.push(['일정', k, String(u.iso), String(u.end || u.iso), String(u.name), KIND_KO[u.kind] || '학사']);
+      });
+    });
+    keep.forEach(function (r) { rows.push(r); });
+    s.clearContents();
+    var rg = s.getRange(1, 1, rows.length, 6);
+    rg.setNumberFormat('@');   // 날짜가 자동 형식 변환되지 않게 텍스트로 고정
+    rg.setValues(rows);
+    return { ok: true, rows: rows.length };
   } finally { lock.releaseLock(); }
 }
 

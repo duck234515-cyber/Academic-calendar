@@ -427,6 +427,9 @@ function sheetToData(rows){
     }else if(t==='비밀번호해시'){
       const h=String(r[1]||'').trim().toLowerCase();
       if(/^[0-9a-f]{64}$/.test(h))d.adminPwHash=h;   // 관리자 비밀번호(SHA-256) — 모든 기기에 적용
+    }else if(t==='연도잠금'){
+      const v=String(r[1]||'').trim();
+      d.lockYear=!(v==='0'||v==='해제'||v==='전체');  // 0/해제/전체 = 모든 연도 열람 허용
     }else if(t==='학기'){
       const k=String(r[1]||'').trim(),s=normDateCell(r[2]),e=normDateCell(r[3]);
       if(/^\d{4}-[12]$/.test(k)&&s&&e)d.terms[k]={start:s,end:e};
