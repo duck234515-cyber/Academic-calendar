@@ -1922,12 +1922,52 @@ function sheetRowsToState(rows){
   d.uid=uid;
   return d;
 }
-async function importFromSheet(silent){
-  if(!SHEET_ID)return false;
+/* gviz JSON 결과를 행 배열로 변환 + CORS가 막힌 환경용 JSONP 예비 경로 (뷰어와 동일 로직) */
+function gvizRowsFromJsonG(json){
+  const rows=[];const t=json&&json.table;if(!t)return rows;
+  const labels=(t.cols||[]).map(c=>c&&c.label?String(c.label):'');
+  if(labels.some(x=>x.trim()))rows.push(labels);
+  (t.rows||[]).forEach(r=>{
+    rows.push((r.c||[]).map(c=>{
+      if(!c)return'';
+      let v=(c.f!==undefined&&c.f!==null)?c.f:c.v;
+      if(v==null)return'';
+      const m=String(v).match(/^Date\((\d+),(\d+),(\d+)/);
+      if(m)return `${m[1]}-${pad(+m[2]+1)}-${pad(+m[3])}`;
+      return String(v);
+    }));
+  });
+  return rows;
+}
+function loadSheetJsonpG(){
+  return new Promise((resolve,reject)=>{
+    const cb='__gviz_cb_'+Math.random().toString(36).slice(2);
+    const s=document.createElement('script');
+    const to=setTimeout(()=>{cleanup();reject(new Error('timeout'));},8000);
+    function cleanup(){clearTimeout(to);try{delete window[cb];}catch(e){}s.remove();}
+    window[cb]=res=>{
+      cleanup();
+      if(!res||res.status==='error')reject(new Error('gviz_error'));
+      else resolve(gvizRowsFromJsonG(res));
+    };
+    s.onerror=()=>{cleanup();reject(new Error('load_error'));};
+    s.src=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&nc=${Date.now()}`;
+    document.head.appendChild(s);
+  });
+}
+async function fetchSheetRowsG(){
   try{
     const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&nc=${Date.now()}`,{cache:'no-store'});
     if(!r.ok)throw 0;
-    const d=sheetRowsToState(parseCSVg(await r.text()));
+    return parseCSVg(await r.text());
+  }catch(e){
+    return await loadSheetJsonpG();   // fetch가 CORS 등으로 막히면 JSONP로 재시도
+  }
+}
+async function importFromSheet(silent){
+  if(!SHEET_ID)return false;
+  try{
+    const d=sheetRowsToState(await fetchSheetRowsG());
     if(!d)throw 0;
     ['year','sem','terms','user','targetWeeks','uid','feedback','submitUrl','lockYear'].forEach(k=>{if(d[k]!==undefined)state[k]=d[k];});
     if(d.feedback===undefined)state.feedback=null;
@@ -1953,15 +1993,12 @@ let sheetPwPlain=null;
 async function findSubmitUrl(){
   if(state.submitUrl)return state.submitUrl;
   try{
-    const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&nc=${Date.now()}`,{cache:'no-store'});
-    if(r.ok){
-      parseCSVg(await r.text()).forEach(row=>{
-        if(String(row[0]||'').trim()!=='제출주소')return;
-        const u=String(row[1]||'').trim();
-        if(/^https:\/\/script\.google(usercontent)?\.com\//.test(u))state.submitUrl=u;
-      });
-      if(state.submitUrl)saveState();
-    }
+    (await fetchSheetRowsG()).forEach(row=>{
+      if(String(row[0]||'').trim()!=='제출주소')return;
+      const u=String(row[1]||'').trim();
+      if(/^https:\/\/script\.google(usercontent)?\.com\//.test(u))state.submitUrl=u;
+    });
+    if(state.submitUrl)saveState();
   }catch(e){}
   return state.submitUrl||null;
 }
