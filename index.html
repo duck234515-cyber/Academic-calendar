@@ -352,6 +352,10 @@ const LS_KEY='academic_calendar_gen_v1';
    조건: 시트가 [공유: 링크가 있는 모든 사용자 - 뷰어] 또는 [웹에 게시] 상태여야 함.
    비우면('') 기존 방식(data.json)으로만 동작합니다. */
 const SHEET_ID='1QF-2WMBWpXuozLgWNqZZoFVPDWnX833Fzarfjhamg0c';
+/* [파일 → 공유 → 웹에 게시]로 만든 공개 CSV 주소 — 1순위 읽기 경로.
+   gviz CSV는 열 타입을 추측해 숫자 셀(학년도·주차 등)을 버리는 문제가 있어,
+   셀 값을 그대로 내보내는 이 경로를 우선 사용한다. (반영에 최대 5분 지연 가능) */
+const PUB_CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRGqVijS9x-5T-yj9B2aydJMMHo14MtDuDCaVrvh_f8c8lYGWOlE2lkDi4yQTfqXWMldu-lrPuncjK9/pub?output=csv';
 const DEFAULT_DATA={
   year:2026, sem:1,
   terms:{'2026-1':{start:'2026-03-03',end:'2026-06-22'},'2026-2':{start:'2026-08-31',end:'2026-12-18'}},
@@ -481,27 +485,36 @@ function loadSheetJsonp(sheetName){
     document.head.appendChild(s);
   });
 }
-/* 시트 행 읽기 : ① fetch CSV → 실패 시 ② JSONP — 둘 다 실패하면 원인을 담아 throw */
-async function fetchSheetRows(sheetName){
-  let e1;
+/* CSV 한 번 받아 행 배열로 (진단용 원문·형식 포함) */
+async function fetchCsvRows(url){
+  const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),8000);
   try{
-    const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),8000);
-    const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`+
-                        (sheetName?`&sheet=${encodeURIComponent(sheetName)}`:'')+`&nc=${Date.now()}`,
-                        {signal:ctl.signal,cache:'no-store'});
-    clearTimeout(to);
+    const r=await fetch(url,{signal:ctl.signal,cache:'no-store'});
     if(!r.ok)throw new Error('HTTP '+r.status);
     const txt=await r.text();
     const rows=parseCSV(txt);
-    rows._raw=txt;rows._ct=r.headers.get('content-type')||'';   // 진단용
+    rows._raw=txt;rows._ct=r.headers.get('content-type')||'';
     return rows;
-  }catch(e){
-    e1=e&&e.name==='AbortError'?'시간초과':String(e&&e.message||e);
+  }finally{clearTimeout(to);}
+}
+const errMsg=e=>e&&e.name==='AbortError'?'시간초과':String(e&&e.message||e);
+/* 시트 행 읽기 : ① 웹에 게시 CSV → ② gviz CSV → ③ gviz JSONP
+   — 모두 실패하면 경로별 원인을 담아 throw. 의견 탭은 gviz만 사용(게시 CSV는 첫 탭 전용) */
+async function fetchSheetRows(sheetName){
+  const errs=[];
+  if(!sheetName&&PUB_CSV_URL){
+    try{return await fetchCsvRows(`${PUB_CSV_URL}&nc=${Date.now()}`);}
+    catch(e){errs.push('게시CSV: '+errMsg(e));}
   }
   try{
-    return await loadSheetJsonp(sheetName);   // CORS 등으로 fetch가 막히면 JSONP로 재시도
+    return await fetchCsvRows(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`+
+                              (sheetName?`&sheet=${encodeURIComponent(sheetName)}`:'')+`&nc=${Date.now()}`);
+  }catch(e){errs.push('CSV: '+errMsg(e));}
+  try{
+    return await loadSheetJsonp(sheetName);   // fetch가 CORS 등으로 막히면 JSONP로 재시도
   }catch(e2){
-    throw new Error(`CSV: ${e1} · JSONP: ${String(e2&&e2.message||e2)}`);
+    errs.push('JSONP: '+errMsg(e2));
+    throw new Error(errs.join(' · '));
   }
 }
 let SHEET_ERR='';   // 시트 읽기 실패 원인 (출처 줄에 표시)

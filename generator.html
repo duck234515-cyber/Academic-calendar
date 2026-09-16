@@ -1864,6 +1864,8 @@ opFile.onchange=async()=>{
    새 브라우저(저장값 없음)에서는 자동으로 한 번 불러온다.
    ============================================================ */
 const SHEET_ID='1QF-2WMBWpXuozLgWNqZZoFVPDWnX833Fzarfjhamg0c';
+/* [파일 → 공유 → 웹에 게시] 공개 CSV — 숫자 셀을 버리는 gviz 대신 1순위로 사용 */
+const PUB_CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vRGqVijS9x-5T-yj9B2aydJMMHo14MtDuDCaVrvh_f8c8lYGWOlE2lkDi4yQTfqXWMldu-lrPuncjK9/pub?output=csv';
 function parseCSVg(txt){
   const rows=[];let row=[],cur='',q=false;
   for(let i=0;i<txt.length;i++){
@@ -1956,6 +1958,12 @@ function loadSheetJsonpG(){
   });
 }
 async function fetchSheetRowsG(){
+  if(PUB_CSV_URL){
+    try{
+      const r=await fetch(`${PUB_CSV_URL}&nc=${Date.now()}`,{cache:'no-store'});
+      if(r.ok)return parseCSVg(await r.text());
+    }catch(e){}
+  }
   try{
     const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&nc=${Date.now()}`,{cache:'no-store'});
     if(!r.ok)throw 0;
