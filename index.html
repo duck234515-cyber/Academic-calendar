@@ -120,8 +120,19 @@
   .legend i{width:14px;height:14px;border-radius:4px;display:inline-block;border:1.5px solid}
 
   /* ---------- month calendar ---------- */
-  .months{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:16px}
-  @media (max-width:880px){.months{grid-template-columns:1fr}}
+  .months{display:grid;grid-template-columns:1fr;gap:18px}
+  .monthnav{position:sticky;top:58px;z-index:25;display:flex;gap:6px;flex-wrap:wrap;
+    background:var(--bg);padding:10px 0 8px;margin:0 0 10px;border-bottom:1.5px solid var(--line)}
+  .monthnav button{border:1.5px solid var(--line-strong);background:var(--surface);border-radius:999px;
+    padding:6px 13px;font:inherit;font-size:13px;font-weight:700;color:var(--text);cursor:pointer}
+  .monthnav button:hover{border-color:var(--brand);color:var(--brand)}
+  .monthnav button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+  .month[id]{scroll-margin-top:118px}
+  @media (min-width:881px){
+    table.cal td{height:82px}
+    table.cal td .n{font-size:14.5px}
+    table.cal td .lbl{font-size:11.5px}
+  }
   .month{background:var(--surface);border:1.5px solid var(--line-strong);border-radius:13px;overflow:hidden;
     display:flex;flex-direction:column}
   .month .mh{padding:10px 15px;font-weight:900;font-size:16px;background:var(--brand);color:#fff;
@@ -676,6 +687,9 @@ function renderCalendar(){
     <span><i style="background:var(--mk-bg);border-color:var(--mk)"></i>보강</span>
     <span><i style="background:var(--event-bg);border-color:var(--event)"></i>행사</span>
     <span><i style="background:#fff;border-color:var(--adm)"></i>학사(텍스트)</span></div>`;
+  html+=`<div class="monthnav no-print" id="monthnav">`+
+    monthsList.map(([yy,mm])=>`<button data-t="m-${yy}-${mm+1}" title="${yy}년 ${mm+1}월로 이동">${mm+1}월</button>`).join('')+
+    `</div>`;
   html+='<div class="months">';
   monthsList.forEach(([yy,mm])=>{
     const first=new Date(yy,mm,1),dim=new Date(yy,mm+1,0).getDate();
@@ -704,14 +718,34 @@ function renderCalendar(){
     const meHtml=mItems.length
       ?mItems.map(it=>`<div class="me ${cls3(it.type)}"><span class="med">${dlabel(it.s,it.e)}</span><span class="men">${it.name}</span></div>`).join('')
       :'<div class="none">— 일정 없음 —</div>';
-    html+=`<div class="month"><div class="mh"><svg class="icon" style="font-size:15px" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>${yy}년 ${mm+1}월</div>`+
+    html+=`<div class="month" id="m-${yy}-${mm+1}"><div class="mh"><svg class="icon" style="font-size:15px" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>${yy}년 ${mm+1}월</div>`+
       `<table class="cal"><thead><tr>${wk.map((w,i)=>`<th class="${i===0?'sun':i===6?'sat':''}">${w}</th>`).join('')}</tr></thead>`+
       `<tbody><tr>${cells}</tr></tbody></table>`+
       `<div class="mevents"><div class="metitle">이달의 주요 일정</div>${meHtml}</div></div>`;
   });
   html+='</div>';
   $('#viewCal').innerHTML=html;
+  wireMonthNav();
 }
+/* 월 바로가기 : 버튼 클릭 시 해당 월로 스크롤 + 스크롤 위치에 따라 현재 월 표시 */
+let calMonthEls=[];
+function wireMonthNav(){
+  const nav=$('#monthnav');if(!nav)return;
+  calMonthEls=[...document.querySelectorAll('.month[id^="m-"]')];
+  nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    const el=document.getElementById(b.dataset.t);
+    if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+  updateMonthNav();
+}
+function updateMonthNav(){
+  const nav=$('#monthnav');
+  if(!nav||!calMonthEls.length||V.view!=='cal')return;
+  let cur=calMonthEls[0].id;
+  calMonthEls.forEach(el=>{if(el.getBoundingClientRect().top<=130)cur=el.id;});
+  nav.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t===cur));
+}
+window.addEventListener('scroll',()=>{requestAnimationFrame(updateMonthNav);},{passive:true});
 
 function buildTableHTML(data,sem){
   const t=data.t;
