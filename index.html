@@ -481,25 +481,34 @@ function loadSheetJsonp(sheetName){
     document.head.appendChild(s);
   });
 }
-/* 시트 행 읽기 : ① fetch CSV → 실패 시 ② JSONP */
+/* 시트 행 읽기 : ① fetch CSV → 실패 시 ② JSONP — 둘 다 실패하면 원인을 담아 throw */
 async function fetchSheetRows(sheetName){
+  let e1;
   try{
     const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),8000);
     const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`+
                         (sheetName?`&sheet=${encodeURIComponent(sheetName)}`:'')+`&nc=${Date.now()}`,
                         {signal:ctl.signal,cache:'no-store'});
     clearTimeout(to);
-    if(!r.ok)throw new Error('http_'+r.status);
+    if(!r.ok)throw new Error('HTTP '+r.status);
     return parseCSV(await r.text());
   }catch(e){
+    e1=e&&e.name==='AbortError'?'시간초과':String(e&&e.message||e);
+  }
+  try{
     return await loadSheetJsonp(sheetName);   // CORS 등으로 fetch가 막히면 JSONP로 재시도
+  }catch(e2){
+    throw new Error(`CSV: ${e1} · JSONP: ${String(e2&&e2.message||e2)}`);
   }
 }
+let SHEET_ERR='';   // 시트 읽기 실패 원인 (출처 줄에 표시)
 async function loadSheet(){
   if(!SHEET_ID)return null;
   try{
-    return sheetToData(await fetchSheetRows(''));
-  }catch(e){return null;}
+    const d=sheetToData(await fetchSheetRows(''));
+    if(!d)SHEET_ERR='응답을 받았으나 시트 형식을 인식하지 못함 (로그인 페이지 응답 가능성 — 공유 설정 확인)';
+    return d;
+  }catch(e){SHEET_ERR=String(e&&e.message||e).replace(/[<>]/g,'');return null;}
 }
 async function loadData(){
   const fromHash=decodeShare();
@@ -514,8 +523,8 @@ async function loadData(){
     }
     return{d:sheet,src:'구글시트 연동 데이터 (실시간)'};
   }
-  // 시트를 읽지 못함 — 어떤 대체 데이터로 표시 중인지 출처에 명시
-  const fail=SHEET_ID?' · ⚠ 구글시트를 읽지 못해 저장본으로 표시 중 — 시트 공유(링크가 있는 모든 사용자) 설정을 확인하세요':'';
+  // 시트를 읽지 못함 — 어떤 대체 데이터로 표시 중인지, 왜 실패했는지 출처에 명시
+  const fail=SHEET_ID?` · ⚠ 구글시트를 읽지 못해 저장본으로 표시 중${SHEET_ERR?` [${SHEET_ERR}]`:''}`:'';
   const ls=readLS(),emb=embeddedData();
   if(ls&&emb&&JSON.stringify(coreOf(ls))===JSON.stringify(coreOf(emb)))
     return{d:emb,src:'게시된 데이터 (최신)'+fail};
