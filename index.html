@@ -275,6 +275,11 @@
   .fbbtns button:hover{background:var(--bg)}
   .fbbtns button.pri{background:var(--brand);border-color:var(--brand);color:#fff}
   .fbbtns button.pri:hover{background:var(--brand-dark)}
+  .rvbtn{border:1.5px solid var(--line-strong);background:var(--surface);border-radius:8px;
+    padding:5px 11px;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--text);white-space:nowrap}
+  .rvbtn[data-act=apply]{border-color:var(--brand);color:var(--brand)}
+  .rvbtn:hover{background:var(--bg)}
+  .rvbtn:disabled{opacity:.5;cursor:default}
   @media print{.fbbar,.fbmodal{display:none!important}}
   [hidden]{display:none!important}
 
@@ -332,6 +337,7 @@
 <footer>
   <span>이 페이지는 <b>학사일정 · 수업일수표 생성기</b>에서 입력한 데이터를 그대로 보여주는 열람 전용 페이지입니다.</span>
   <a href="generator.html" id="lnkAdmin">⚙ 생성기(관리자) 열기</a>
+  <a href="#" id="lnkReview" hidden>💬 의견 검토(관리자)</a>
 </footer>
 
 <script>
@@ -415,6 +421,9 @@ function sheetToData(rows){
     else if(t==='의견수렴'){
       const s=normDateCell(r[2]),e=normDateCell(r[3]);
       if(s&&e)d.feedback={start:s<=e?s:e,end:s<=e?e:s};
+    }else if(t==='제출주소'){
+      const u=String(r[1]||'').trim();
+      if(/^https:\/\/script\.google(usercontent)?\.com\//.test(u))d.submitUrl=u;
     }else if(t==='학기'){
       const k=String(r[1]||'').trim(),s=normDateCell(r[2]),e=normDateCell(r[3]);
       if(/^\d{4}-[12]$/.test(k)&&s&&e)d.terms[k]={start:s,end:e};
@@ -961,6 +970,8 @@ function render(){
 const escFb=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let fbItems=[];
 function setupFeedback(){
+  const lnk=$('#lnkReview');
+  if(lnk){lnk.hidden=!D.submitUrl;lnk.onclick=e=>{e.preventDefault();openReview();};}
   const bar=$('#fbbar');
   const fb=D.feedback;
   if(!fb||!fb.start||!fb.end||todayISO<fb.start||todayISO>fb.end){bar.hidden=true;return;}
@@ -977,7 +988,9 @@ function openFbModal(){
   m.hidden=false;
   m.innerHTML=`<div class="fbbox">
     <h2>학사일정 수정 의견 제출 <span class="fbclose" title="닫기">×</span></h2>
-    <p class="sub">의견을 목록에 담은 뒤 <b>[의견 파일 저장]</b>을 누르면 JSON 파일이 내려받아집니다. 이 파일을 <b>이메일·메신저로 학사일정 담당 부서에</b> 보내주시면 검토 후 반영됩니다.</p>
+    <p class="sub">${D.submitUrl
+      ?'의견을 목록에 담은 뒤 <b>[의견 제출]</b>을 누르면 담당 부서에 <b>바로 전송</b>됩니다. 검토 후 반영되면 학사일정에 표시됩니다.'
+      :'의견을 목록에 담은 뒤 <b>[의견 파일 저장]</b>을 누르면 JSON 파일이 내려받아집니다. 이 파일을 <b>이메일·메신저로 학사일정 담당 부서에</b> 보내주시면 검토 후 반영됩니다.'}</p>
     <label>부서명 <em>(필수)</em></label>
     <input type="text" id="fbDept" placeholder="예: 교무처 학사지원팀" value="${escFb(dept)}">
     <div class="fbrow">
@@ -1046,7 +1059,7 @@ function openFbModal(){
       list.appendChild(el);
     });
     list.querySelectorAll('.rm').forEach(x=>x.onclick=()=>{fbItems.splice(+x.dataset.i,1);renderItems();});
-    $('#fbSave').textContent=`의견 파일 저장 (${fbItems.length}건)`;
+    $('#fbSave').textContent=D.submitUrl?`의견 제출 (${fbItems.length}건)`:`의견 파일 저장 (${fbItems.length}건)`;
   };
   renderItems();
   $('#fbAdd').onclick=()=>{
@@ -1058,16 +1071,36 @@ function openFbModal(){
     if((type==='edit'||type==='del')&&!tObj){alert('대상 일정을 선택해 주세요');return;}
     if(type==='edit'&&!name&&!iso&&!end&&!note){alert('변경할 내용(명칭·날짜)이나 의견을 입력해 주세요');return;}
     if(type==='etc'&&!note){alert('의견 내용을 입력해 주세요');return;}
-    fbItems.push({term,type,targetId:tObj?tObj.id:null,targetName:tObj?tObj.name:'',
+    fbItems.push({term,type,targetId:tObj?tObj.id:null,targetName:tObj?tObj.name:'',targetIso:tObj?tObj.iso:'',
                   name,iso,end:end||iso,kind:type==='add'?$('#fbKind').value:'',note});
     $('#fbName').value='';$('#fbStart').value='';$('#fbEnd').value='';$('#fbNote').value='';
     renderItems();
   };
-  $('#fbSave').onclick=()=>{
+  $('#fbSave').onclick=async()=>{
     const dv=$('#fbDept').value.trim();
     if(!dv){alert('부서명을 입력해 주세요');$('#fbDept').focus();return;}
     if(!fbItems.length){alert('담긴 의견이 없습니다 — [목록에 담기]로 먼저 추가해 주세요');return;}
     try{localStorage.setItem('ac_fb_dept',dv);}catch(e){}
+    if(D.submitUrl){
+      // 접수 스크립트(Apps Script)로 바로 전송
+      const btn=$('#fbSave');btn.disabled=true;btn.textContent='전송 중…';
+      const TYPE_KO={add:'추가',edit:'수정',del:'삭제',etc:'기타'};
+      const KIND_KO={off:'휴업일',exam:'시험',makeup:'보강',event:'행사',admin:'학사'};
+      const items=fbItems.map(it=>({term:it.term,type:TYPE_KO[it.type]||'기타',
+        targetName:it.targetName,targetIso:it.targetIso||'',name:it.name,
+        iso:it.iso,end:it.end,kind:it.kind?(KIND_KO[it.kind]||'학사'):'',note:it.note}));
+      try{
+        const res=await postJSON(D.submitUrl,{action:'submit',dept:dv,items});
+        if(res&&res.ok){
+          alert(`의견 ${res.count}건이 제출되었습니다.\n담당 부서가 검토 후 반영하면 학사일정에 표시됩니다.`);
+          fbItems=[];m.hidden=true;return;
+        }
+        throw new Error(res&&res.error||'unknown');
+      }catch(e){
+        alert('전송하지 못했습니다. 잠시 후 다시 시도해 주세요.\n(계속 실패하면 담당 부서에 직접 연락해 주세요)');
+        btn.disabled=false;renderItems();return;
+      }
+    }
     const out={app:'academic_calendar_feedback',ver:1,dept:dv,submittedAt:todayISO,items:fbItems};
     const blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);
@@ -1076,6 +1109,90 @@ function openFbModal(){
     alert('의견 파일이 저장되었습니다.\n\n저장된 파일을 이메일·메신저로 학사일정 담당 부서에 보내주시면, 검토 후 학사일정에 반영됩니다.');
     fbItems=[];m.hidden=true;
   };
+}
+/* Apps Script 웹앱 호출 (text/plain POST = 사전요청 없이 CORS 허용) */
+async function postJSON(url,obj){
+  const r=await fetch(url,{method:'POST',redirect:'follow',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(obj)});
+  return await r.json();
+}
+
+/* ============================================================
+   3.6 의견 검토 (관리자) : 시트의 '의견' 탭에서 대기 건을 읽어
+      [반영]/[반려] — 반영 시 접수 스크립트가 시트의 일정을 직접 수정
+   ============================================================ */
+let adminPwPlain=null;
+async function openReview(){
+  if(!D.submitUrl){alert('접수 스크립트(제출주소)가 설정되지 않았습니다');return;}
+  if(!adminPwPlain){
+    const pw=prompt('관리자 비밀번호를 입력하세요');
+    if(pw===null)return;
+    const hash=D.adminPwHash||DEFAULT_PW_HASH;
+    let ok=false;try{ok=(await sha256hex(pw))===hash;}catch(e){}
+    if(!ok){alert('비밀번호가 올바르지 않습니다');return;}
+    adminPwPlain=pw;
+  }
+  const m=$('#fbmodal');
+  m.hidden=false;
+  m.innerHTML=`<div class="fbbox">
+    <h2>부서 의견 검토 <span class="fbclose" title="닫기">×</span></h2>
+    <p class="sub">[반영]을 누르면 구글시트의 일정이 바로 수정되고, 사이트 새로고침 시 모두에게 반영됩니다.</p>
+    <div id="rvList" class="fbitems" style="border-top:0;padding-top:0">불러오는 중…</div>
+    <div class="fbbtns"><button id="rvClose">닫기</button><button class="pri" id="rvReload">새로고침</button></div>
+  </div>`;
+  const close=()=>{m.hidden=true;};
+  m.querySelector('.fbclose').onclick=close;
+  $('#rvClose').onclick=close;
+  m.onclick=e=>{if(e.target===m)close();};
+  $('#rvReload').onclick=loadReview;
+  await loadReview();
+}
+async function loadReview(){
+  const box=$('#rvList');if(!box)return;
+  box.textContent='불러오는 중…';
+  let rows;
+  try{
+    const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('의견')}&nc=${Date.now()}`,{cache:'no-store'});
+    if(!r.ok)throw 0;
+    rows=parseCSV(await r.text());
+  }catch(e){box.textContent='의견 목록을 읽지 못했습니다 — 아직 제출된 의견이 없거나 시트 공유 설정을 확인해 주세요';return;}
+  // 열: 0제출일시 1부서명 2학기 3구분 4대상일정 5대상시작일 6제안명칭 7제안시작일 8제안종료일 9분류 10의견 11상태
+  const pend=[];
+  rows.forEach((r,i)=>{
+    if(i===0)return;                       // 머리글
+    if(String(r[11]||'').trim()!=='대기')return;
+    pend.push({row:i+1,ts:r[0],dept:r[1],term:r[2],type:String(r[3]||'').trim(),
+      targetName:r[4],name:r[6],iso:r[7],end:r[8],note:r[10]});
+  });
+  if(!pend.length){box.textContent='대기 중인 의견이 없습니다';return;}
+  box.innerHTML=pend.map(o=>{
+    const range=o.iso?(o.iso+(o.end&&o.end!==o.iso?'~'+o.end:'')):'';
+    let desc='';
+    if(o.type==='추가')desc=`${escFb(o.name)} · ${range}`;
+    else if(o.type==='수정')desc=`'${escFb(o.targetName)}' → ${o.name?escFb(o.name):'(명칭 유지)'}${range?' · '+range:''}`;
+    else if(o.type==='삭제')desc=`'${escFb(o.targetName)}' 삭제`;
+    else desc=escFb(o.note);
+    const noteLine=(o.type!=='기타'&&o.note)?`<div style="font-size:12px;color:var(--muted)">"${escFb(o.note)}"</div>`:'';
+    return `<div class="fi" style="align-items:flex-start">
+      <span class="t"><b>[${escFb(o.dept)}·${escFb(o.type)}]</b> ${desc}
+        <div style="font-size:11.5px;color:var(--faint)">${escFb(o.term)} 학기 · ${escFb(o.ts)} 제출</div>${noteLine}</span>
+      ${o.type!=='기타'?`<button class="rvbtn" data-act="apply" data-row="${o.row}" data-ts="${escFb(o.ts)}" data-dept="${escFb(o.dept)}">반영</button>`:''}
+      <button class="rvbtn" data-act="close" data-row="${o.row}" data-ts="${escFb(o.ts)}" data-dept="${escFb(o.dept)}">${o.type==='기타'?'확인':'반려'}</button>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.rvbtn').forEach(b=>b.onclick=async()=>{
+    b.disabled=true;b.textContent='처리 중…';
+    const act=b.dataset.act;
+    try{
+      const res=await postJSON(D.submitUrl,{action:act,pw:adminPwPlain,row:+b.dataset.row,
+        ts:b.dataset.ts,dept:b.dataset.dept,status:'반려'});
+      if(res&&res.ok){
+        if(act==='apply')alert('반영되었습니다 — 새로고침하면 달력에 표시됩니다.');
+        await loadReview();
+      }else if(res&&res.error==='bad_pw'){adminPwPlain=null;alert('스크립트의 관리자 비밀번호(ADMIN_PW)와 일치하지 않습니다. Apps Script의 ADMIN_PW 설정을 확인해 주세요.');}
+      else{alert('처리하지 못했습니다: '+(res&&res.error||'알 수 없는 오류'));await loadReview();}
+    }catch(e){alert('처리하지 못했습니다 — 잠시 후 다시 시도해 주세요');await loadReview();}
+  });
 }
 
 /* ============================================================
