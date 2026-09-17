@@ -291,6 +291,11 @@
     border:1.5px solid var(--line-strong);border-radius:9px;padding:9px 10px;font:inherit;font-size:14px;
     background:var(--surface);color:var(--text)}
   .fbbox textarea{min-height:66px;resize:vertical}
+  .fbtypes{display:flex;gap:6px;flex-wrap:wrap}
+  .fbtypes button{flex:1 1 auto;border:1.5px solid var(--line-strong);background:var(--surface);border-radius:9px;
+    padding:8px 10px;font:inherit;font-size:13px;font-weight:700;cursor:pointer;color:var(--text);white-space:nowrap}
+  .fbtypes button:hover{border-color:var(--brand);color:var(--brand)}
+  .fbtypes button.on{background:var(--brand);border-color:var(--brand);color:#fff}
   .fbrow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .fbitems{margin:14px 0 0;border-top:1px solid var(--line);padding-top:8px}
   .fbitems .fih{font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:4px}
@@ -1218,16 +1223,17 @@ function openFbModal(){
       :'의견을 목록에 담은 뒤 <b>[의견 파일 저장]</b>을 누르면 JSON 파일이 내려받아집니다. 이 파일을 <b>이메일·메신저로 학사일정 담당 부서에</b> 보내주시면 검토 후 반영됩니다.'}</p>
     <label>부서명 <em>(필수)</em></label>
     <input type="text" id="fbDept" placeholder="예: 교무처 학사지원팀" value="${escFb(dept)}">
-    <div class="fbrow">
-      <div><label>대상 학기</label><select id="fbTerm">
-        ${[1,2].map(s=>`<option value="${y}-${s}"${D.sem===s?' selected':''}>${y}학년도 ${s}학기</option>`).join('')}
-      </select></div>
-      <div><label>의견 구분</label><select id="fbType">
-        <option value="edit">기존 일정 수정</option>
-        <option value="add">일정 추가 요청</option>
-        <option value="del">일정 삭제 요청</option>
-        <option value="etc">기타 의견</option></select></div>
+    <label>의견 구분</label>
+    <div class="fbtypes" id="fbTypeSeg">
+      <button type="button" data-t="edit" class="on">기존 일정 수정</button>
+      <button type="button" data-t="add">➕ 새 일정 추가</button>
+      <button type="button" data-t="del">일정 삭제</button>
+      <button type="button" data-t="etc">기타 의견</button>
     </div>
+    <label>대상 학기</label>
+    <select id="fbTerm">
+      ${[1,2].map(s=>`<option value="${y}-${s}"${D.sem===s?' selected':''}>${y}학년도 ${s}학기</option>`).join('')}
+    </select>
     <div id="fbTargetWrap"><label>대상 일정</label>
       <input type="text" id="fbTargetQ" placeholder="🔍 일정 이름·날짜로 검색" autocomplete="off" style="margin-bottom:6px">
       <select id="fbTarget"></select>
@@ -1254,10 +1260,11 @@ function openFbModal(){
   m.querySelector('.fbclose').onclick=close;
   $('#fbCancel').onclick=close;
   m.onclick=e=>{if(e.target===m)close();};
+  let fbType='edit';   // 의견 구분 (버튼 선택)
   /* 선택된 대상 일정의 현재 날짜를 보여줘, 무엇을 바꾸는지 확인하며 작성하게 한다 */
   const refreshCurLine=()=>{
     const el=$('#fbCurLine');if(!el)return;
-    const t=$('#fbType').value;
+    const t=fbType;
     const tObj=fbTargets($('#fbTerm').value).find(u=>u.id===+$('#fbTarget').value);
     el.innerHTML=(tObj&&(t==='edit'||t==='del'))
       ?`현재 일정 : <b>${escFb(tObj.name)}</b> · <b>${tObj.iso}${tObj.end&&tObj.end!==tObj.iso?' ~ '+tObj.end:''}</b>${t==='edit'?' — 변경할 내용만 아래에 입력하세요':''}`
@@ -1273,7 +1280,7 @@ function openFbModal(){
     refreshCurLine();
   };
   const refreshType=()=>{
-    const t=$('#fbType').value;
+    const t=fbType;
     $('#fbTargetWrap').hidden=!(t==='edit'||t==='del');
     $('#fbNameWrap').hidden=!(t==='edit'||t==='add');
     $('#fbKindWrap').hidden=t!=='add';
@@ -1284,7 +1291,11 @@ function openFbModal(){
     $('#fbNoteLbl').innerHTML=t==='etc'?'의견 내용 <em>(필수)</em>':'의견 내용 <em>(사유 등, 선택)</em>';
   };
   $('#fbTerm').onchange=refreshTargets;
-  $('#fbType').onchange=refreshType;
+  m.querySelectorAll('#fbTypeSeg button').forEach(b=>b.onclick=()=>{
+    fbType=b.dataset.t;
+    m.querySelectorAll('#fbTypeSeg button').forEach(x=>x.classList.toggle('on',x===b));
+    refreshType();
+  });
   $('#fbTargetQ').oninput=refreshTargets;
   $('#fbTarget').onchange=refreshCurLine;
   refreshTargets();refreshType();
@@ -1307,7 +1318,7 @@ function openFbModal(){
   };
   renderItems();
   $('#fbAdd').onclick=()=>{
-    const type=$('#fbType').value,term=$('#fbTerm').value;
+    const type=fbType,term=$('#fbTerm').value;
     const name=$('#fbName').value.trim(),iso=$('#fbStart').value,end=$('#fbEnd').value,note=$('#fbNote').value.trim();
     const targetId=$('#fbTarget').value?+$('#fbTarget').value:null;
     const tObj=fbTargets(term).find(u=>u.id===targetId);
