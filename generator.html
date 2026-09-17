@@ -1913,7 +1913,10 @@ async function sheetOpAction(o,act,btn){
       body:JSON.stringify({action:act,pw:sheetPwPlain,row:o.row,ts:o.ts,dept:o.dept,status:'반려'})});
     const res=await r.json();
     if(res&&res.ok){
-      if(act==='apply')toast('구글시트에 반영되었습니다 — [시트에서 불러오기]를 누르면 이 화면에도 반영됩니다');
+      if(act==='apply'){
+        await importFromSheet(true,true);   // 시트가 방금 수정됨 — 실시간 경로로 최신 일정을 받아 화면 갱신
+        toast('반영 완료 — 시트의 최신 일정으로 화면을 갱신했습니다');
+      }
       await loadSheetOpinions(true);
     }else if(res&&res.error==='bad_pw'){
       sheetPwPlain=null;renderOpinions();
@@ -2096,7 +2099,10 @@ function loadSheetJsonpG(sheetName){
     document.head.appendChild(s);
   });
 }
-async function fetchSheetRowsG(sheetName){
+async function fetchSheetRowsG(sheetName,fresh){
+  if(fresh){                            // 실시간 우선 — 게시 CSV의 최대 5분 지연을 피해야 할 때(반영 직후 등)
+    try{return await loadSheetJsonpG(sheetName);}catch(e){}
+  }
   if(!sheetName&&PUB_CSV_URL){          // 게시 CSV는 첫 탭 전용
     try{
       const r=await fetch(`${PUB_CSV_URL}&nc=${Date.now()}`,{cache:'no-store'});
@@ -2126,10 +2132,10 @@ async function syncSettingsFromSheet(){
     saveState();render();
   }catch(e){}
 }
-async function importFromSheet(silent){
+async function importFromSheet(silent,fresh){
   if(!SHEET_ID)return false;
   try{
-    const d=sheetRowsToState(await fetchSheetRowsG());
+    const d=sheetRowsToState(await fetchSheetRowsG('',fresh));
     if(!d)throw 0;
     ['year','sem','terms','user','targetWeeks','uid','feedback','priority','submitUrl','lockYear'].forEach(k=>{if(d[k]!==undefined)state[k]=d[k];});
     if(d.feedback===undefined)state.feedback=null;
@@ -2144,7 +2150,7 @@ async function importFromSheet(silent){
 }
 $('#btnSheet').onclick=()=>{
   if(!confirm('연동 구글시트의 현재 일정으로 이 화면의 입력값을 덮어쓸까요?\n(시트가 최신 원본입니다 — 이 화면은 수업일수표 확인·인쇄용으로 사용하세요)'))return;
-  importFromSheet(false);
+  importFromSheet(false,true);   // 방금 고친 내용을 바로 가져오도록 실시간 경로 사용
 };
 
 /* ============================================================
