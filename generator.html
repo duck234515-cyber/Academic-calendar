@@ -1785,6 +1785,20 @@ $('#btnData').onclick=()=>{
    ============================================================ */
 const escOp=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let sheetOps=[];   // 시트 '의견' 탭에서 불러온 대기 건 (저장하지 않음 — 시트가 원본)
+/* 대상 일정의 현재 날짜 범위 — 화면의 일정에서 찾고, 없으면 제출 당시 기록(대상시작일)으로 대체 */
+function curTargetRange(term,name,tIso){
+  const arr=(state.user||{})[term]||[];
+  const t=arr.find(u=>u.name===name&&(!tIso||u.iso===tIso))||arr.find(u=>u.name===name);
+  if(t)return t.iso+(t.end&&t.end!==t.iso?'~'+t.end:'');
+  return tIso||'';
+}
+/* 검토 항목의 "기존 → 변경" 비교 줄 (수정·삭제 의견) */
+function cmpLine(type,term,targetName,targetIso,range){
+  if(type!=='수정'&&type!=='삭제'&&type!=='edit'&&type!=='del')return'';
+  const cur=curTargetRange(term,targetName,targetIso)||'?';
+  const after=(type==='삭제'||type==='del')?'삭제':(range?range:'날짜 유지');
+  return `<div class="dt">기존 <b>${escOp(cur)}</b> → 변경 <b>${escOp(after)}</b></div>`;
+}
 function renderOpinions(){
   const box=$('#opList'),line=$('#fbPeriodLine');
   if(!box||!line)return;
@@ -1802,14 +1816,15 @@ function renderOpinions(){
     const range=o.iso?(o.iso+(o.end&&o.end!==o.iso?'~'+o.end:'')):'';
     let desc='';
     if(o.type==='추가')desc=`${escOp(o.name)} · ${range}`;
-    else if(o.type==='수정')desc=`'${escOp(o.targetName)}' → ${o.name?escOp(o.name):'(명칭 유지)'}${range?' · '+range:''}`;
+    else if(o.type==='수정')desc=`'${escOp(o.targetName)}'${o.name?` → '${escOp(o.name)}'`:''}`;
     else if(o.type==='삭제')desc=`'${escOp(o.targetName)}' 삭제 요청`;
     else desc=escOp(o.note);
+    const cmp=cmpLine(o.type,o.term,o.targetName,o.targetIso,range);
     const noteLine=(o.type!=='기타'&&o.note)?`<div class="dt">"${escOp(o.note)}"</div>`:'';
     el.innerHTML=`
       <span class="dot" style="background:${typeDotS[o.type]||'#888'}"></span>
       <div class="meta"><div class="nm">[${escOp(o.dept||'무기명')}·${escOp(o.type)}] ${desc}</div>
-        <div class="dt">${escOp(o.term||'')} 학기 · ${escOp(o.ts||'')} 제출</div>${noteLine}</div>
+        ${cmp}<div class="dt">${escOp(o.term||'')} 학기 · ${escOp(o.ts||'')} 제출</div>${noteLine}</div>
       ${o.type!=='기타'?`<button class="btn" style="padding:3px 9px;font-size:12px" data-sap="${o.row}">반영</button>`:''}
       <button class="btn ghost" style="padding:3px 9px;font-size:12px" data-scl="${o.row}">${o.type==='기타'?'확인':'반려'}</button>`;
     box.appendChild(el);
@@ -1822,14 +1837,15 @@ function renderOpinions(){
     const range=o.iso?(o.iso+(o.end&&o.end!==o.iso?'~'+o.end:'')):'';
     let desc='';
     if(o.type==='add')desc=`${escOp(o.name)} · ${range}`;
-    else if(o.type==='edit')desc=`'${escOp(o.targetName)}' → ${o.name?escOp(o.name):'(명칭 유지)'}${range?' · '+range:''}`;
+    else if(o.type==='edit')desc=`'${escOp(o.targetName)}'${o.name?` → '${escOp(o.name)}'`:''}`;
     else if(o.type==='del')desc=`'${escOp(o.targetName)}' 삭제 요청`;
     else desc=escOp(o.note);
+    const cmp=cmpLine(o.type,o.term,o.targetName,o.targetIso,range);
     const noteLine=(o.type!=='etc'&&o.note)?`<div class="dt">"${escOp(o.note)}"</div>`:'';
     el.innerHTML=`
       <span class="dot" style="background:${typeDot[o.type]||'#888'}"></span>
       <div class="meta"><div class="nm">[${escOp(o.dept||'무기명')}·${typeLbl[o.type]||''}] ${desc}</div>
-        <div class="dt">${escOp(o.term||'')} 학기 · ${escOp(o.submittedAt||'')} 제출</div>${noteLine}</div>
+        ${cmp}<div class="dt">${escOp(o.term||'')} 학기 · ${escOp(o.submittedAt||'')} 제출</div>${noteLine}</div>
       ${o.status==='done'
         ?'<span class="tag admin">처리됨</span>'
         :(o.type!=='etc'?`<button class="btn" style="padding:3px 9px;font-size:12px" data-ap="${o.oid}">반영</button>`:'')}
@@ -1876,7 +1892,8 @@ async function loadSheetOpinions(silent){
     if(i===0)return;                       // 머리글
     if(String(r[11]||'').trim()!=='대기')return;
     sheetOps.push({row:i+1,ts:r[0],dept:r[1],term:r[2],type:String(r[3]||'').trim(),
-      targetName:r[4],name:r[6],iso:normDateCellg(r[7])||r[7],end:normDateCellg(r[8])||r[8],note:r[10]});
+      targetName:r[4],targetIso:normDateCellg(r[5])||String(r[5]||'').trim(),
+      name:r[6],iso:normDateCellg(r[7])||r[7],end:normDateCellg(r[8])||r[8],note:r[10]});
   });
   renderOpinions();
   if(!silent)toast(sheetOps.length?`대기 중인 의견 ${sheetOps.length}건을 불러왔습니다`:'대기 중인 의견이 없습니다');

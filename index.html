@@ -1228,7 +1228,11 @@ function openFbModal(){
         <option value="del">일정 삭제 요청</option>
         <option value="etc">기타 의견</option></select></div>
     </div>
-    <div id="fbTargetWrap"><label>대상 일정</label><select id="fbTarget"></select></div>
+    <div id="fbTargetWrap"><label>대상 일정</label>
+      <input type="text" id="fbTargetQ" placeholder="🔍 일정 이름·날짜로 검색" autocomplete="off" style="margin-bottom:6px">
+      <select id="fbTarget"></select>
+      <p class="sub" id="fbCurLine" style="margin:6px 0 0"></p>
+    </div>
     <div id="fbNameWrap"><label id="fbNameLbl"></label><input type="text" id="fbName" placeholder="예: 중간고사"></div>
     <div id="fbKindWrap"><label>분류</label><select id="fbKind">
       <option value="admin">학사</option><option value="off">휴업일</option>
@@ -1250,11 +1254,23 @@ function openFbModal(){
   m.querySelector('.fbclose').onclick=close;
   $('#fbCancel').onclick=close;
   m.onclick=e=>{if(e.target===m)close();};
+  /* 선택된 대상 일정의 현재 날짜를 보여줘, 무엇을 바꾸는지 확인하며 작성하게 한다 */
+  const refreshCurLine=()=>{
+    const el=$('#fbCurLine');if(!el)return;
+    const t=$('#fbType').value;
+    const tObj=fbTargets($('#fbTerm').value).find(u=>u.id===+$('#fbTarget').value);
+    el.innerHTML=(tObj&&(t==='edit'||t==='del'))
+      ?`현재 일정 : <b>${escFb(tObj.name)}</b> · <b>${tObj.iso}${tObj.end&&tObj.end!==tObj.iso?' ~ '+tObj.end:''}</b>${t==='edit'?' — 변경할 내용만 아래에 입력하세요':''}`
+      :'';
+  };
   const refreshTargets=()=>{
-    const ts=fbTargets($('#fbTerm').value);
+    const q=($('#fbTargetQ')?$('#fbTargetQ').value.trim().toLowerCase():'');
+    const all=fbTargets($('#fbTerm').value);
+    const ts=q?all.filter(u=>`${u.name} ${u.iso} ${u.end||''}`.toLowerCase().includes(q)):all;
     $('#fbTarget').innerHTML=ts.length
       ?ts.map(u=>`<option value="${u.id}">${escFb(u.name)} (${u.iso}${u.end&&u.end!==u.iso?'~'+u.end:''})</option>`).join('')
-      :'<option value="">이 학기에 등록된 일정이 없습니다</option>';
+      :`<option value="">${q?'검색 결과가 없습니다':'이 학기에 등록된 일정이 없습니다'}</option>`;
+    refreshCurLine();
   };
   const refreshType=()=>{
     const t=$('#fbType').value;
@@ -1262,12 +1278,15 @@ function openFbModal(){
     $('#fbNameWrap').hidden=!(t==='edit'||t==='add');
     $('#fbKindWrap').hidden=t!=='add';
     $('#fbDateWrap').hidden=!(t==='edit'||t==='add');
+    refreshCurLine();
     $('#fbNameLbl').innerHTML=t==='add'?'일정 명칭 <em>(필수)</em>':'변경 명칭 <em>(선택 — 비우면 유지)</em>';
     $('#fbStartLbl').innerHTML=t==='add'?'시작일 <em>(필수)</em>':'제안 시작일 <em>(선택)</em>';
     $('#fbNoteLbl').innerHTML=t==='etc'?'의견 내용 <em>(필수)</em>':'의견 내용 <em>(사유 등, 선택)</em>';
   };
   $('#fbTerm').onchange=refreshTargets;
   $('#fbType').onchange=refreshType;
+  $('#fbTargetQ').oninput=refreshTargets;
+  $('#fbTarget').onchange=refreshCurLine;
   refreshTargets();refreshType();
   const renderItems=()=>{
     const list=$('#fbList');
