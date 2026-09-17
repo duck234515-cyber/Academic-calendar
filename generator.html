@@ -575,7 +575,8 @@
 /* 관리자 잠금 : 뷰어의 [관리자] 버튼을 통과했으면 그대로 진입,
    주소로 직접 들어오면 비밀번호 확인 (틀리면 열람 페이지로 이동)
    비밀번호는 SHA-256 해시로만 저장·비교. 유효 해시 우선순위:
-   이 브라우저의 변경값(localStorage) → 게시본(index.html 내장) → data.json → 초기값 */
+   이 브라우저의 변경값(localStorage) → 구글시트의 비밀번호해시 행 → 게시본(index.html 내장)
+   → data.json → 초기값  (새 기기·시크릿 창에서도 시트의 비밀번호가 통하도록) */
 document.documentElement.style.visibility='hidden';
 window.AC_DEFAULT_PW_HASH='6719009a76851c4bed2fcdea10b635c1bd58bf12af0c1fea3a470a87d3ee6995';
 window.AC_SHA256=async function(s){
@@ -587,6 +588,18 @@ window.AC_PW_HASH_P=(async function(){
     const st=JSON.parse(localStorage.getItem('academic_calendar_gen_v1'));
     if(st&&st.adminPwHash)return st.adminPwHash;
   }catch(e){}
+  // 구글시트의 비밀번호해시 행 — 아래 본문의 PUB_CSV_URL/SHEET_ID와 같은 값 (게이트는 독립 실행이라 중복 유지)
+  const AC_SHEET_URLS=[
+    'https://docs.google.com/spreadsheets/d/e/2PACX-1vRGqVijS9x-5T-yj9B2aydJMMHo14MtDuDCaVrvh_f8c8lYGWOlE2lkDi4yQTfqXWMldu-lrPuncjK9/pub?output=csv',
+    'https://docs.google.com/spreadsheets/d/1QF-2WMBWpXuozLgWNqZZoFVPDWnX833Fzarfjhamg0c/gviz/tq?tqx=out:csv'
+  ];
+  for(const u of AC_SHEET_URLS){
+    try{
+      const t=await (await fetch(u+'&nc='+Date.now(),{cache:'no-store'})).text();
+      const m=t.match(/(?:^|\n)\s*"?비밀번호해시"?\s*,\s*"?([0-9a-fA-F]{64})"?/);
+      if(m)return m[1].toLowerCase();
+    }catch(e){}
+  }
   try{
     const t=await (await fetch('./',{cache:'no-store'})).text();
     const m=t.match(/id="published-data"[^>]*>([\s\S]*?)<\/scr/);
