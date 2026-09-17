@@ -77,12 +77,16 @@ function normD(v) {
 }
 
 /* 학기키 복원 : 시트가 '2027-1'을 날짜(2027년 1월)로 자동 변환해 저장하는 경우가 있어
-   Date나 '2027. 1.' 같은 형태를 다시 '2027-1' 텍스트로 되돌린다 */
+   Date나 '2027. 1.' · 'Fri Jan 01 2027' 같은 형태를 다시 '2027-1' 텍스트로 되돌린다 */
 function normTerm(v) {
   if (v instanceof Date) return v.getFullYear() + '-' + (v.getMonth() + 1);
   var s = String(v || '').trim();
   var m = s.match(/^(\d{4})\D+([12])\D*$/);
-  return m ? m[1] + '-' + m[2] : s;
+  if (m) return m[1] + '-' + m[2];
+  var d = new Date(s);
+  if (!isNaN(d.getTime()) && (d.getMonth() === 0 || d.getMonth() === 1))
+    return d.getFullYear() + '-' + (d.getMonth() + 1);
+  return s;
 }
 
 /* 행을 텍스트 서식으로 고정해 추가 — 날짜·학기키가 자동 변환되지 않게 */
