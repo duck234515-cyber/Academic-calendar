@@ -54,6 +54,9 @@
   }
   .btn:hover{background:var(--accent-soft);border-color:var(--accent-line)}
   .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .btn.needsync{box-shadow:0 0 0 2px #d9822b;position:relative}
+  .btn.needsync::after{content:"반영 안 됨";position:absolute;top:-9px;right:-6px;font-size:9px;font-weight:900;
+    background:#d9822b;color:#fff;border-radius:6px;padding:1px 6px;line-height:1.4}
   .btn.primary:hover{background:#2f3c52}
   .btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
   .btn.ghost:hover{background:var(--accent-soft);color:var(--text)}
@@ -904,6 +907,7 @@ const state={
 /* ===== 자동 저장 (브라우저 localStorage, 백엔드 불필요) ===== */
 const LS_KEY='academic_calendar_gen_v1';
 function saveState(){
+  try{scheduleAutoPush();}catch(e){}   // 일정·설정 변경 시 구글시트 자동 반영 예약
   try{
     localStorage.setItem(LS_KEY, JSON.stringify({
       year:state.year, sem:state.sem, terms:state.terms,
@@ -2169,6 +2173,7 @@ async function syncSettingsFromSheet(){
     if(d.lockYear!==undefined)state.lockYear=d.lockYear;
     if(d.submitUrl)state.submitUrl=d.submitUrl;
     saveState();render();
+    markSheetSynced();   // 설정 동기화 시점의 화면을 기준으로 이후 변경분부터 자동 반영
   }catch(e){}
 }
 /* 경로별로 시도하되 형식 인식까지 성공해야 채택 (뷰어 loadSheet와 같은 방식)
@@ -2208,6 +2213,7 @@ async function importFromSheet(silent,fresh){
   if(d.priority===undefined)state.priority=null;
   saveState();
   render();
+  markSheetSynced();   // 지금 화면 = 시트 — 이후 변경분부터 자동 반영
   if(!silent)toast('구글시트의 학사일정을 불러왔습니다');
   return true;
 }
@@ -2266,7 +2272,7 @@ async function pushToSheet(){
               targetWeeks:state.targetWeeks,feedback:state.feedback,priority:state.priority,
               lockYear:state.lockYear}})});
     const res=await r.json();
-    if(res&&res.ok)toast(`구글시트에 반영되었습니다 (${res.rows}행) — 뷰어는 새로고침 시 반영됩니다`);
+    if(res&&res.ok){markSheetSynced();toast(`구글시트에 반영되었습니다 (${res.rows}행) — 뷰어는 새로고침 시 반영됩니다`);}
     else if(res&&res.error==='bad_pw'){sheetPwPlain=null;alert('접수 스크립트의 관리자 비밀번호(ADMIN_PW)와 일치하지 않습니다.\nApps Script의 ADMIN_PW 설정을 확인해 주세요.');}
     else if(res&&res.error==='bad_action')alert('접수 스크립트가 구버전입니다.\napps-script.gs 최신 내용으로 교체한 뒤 [배포 관리]에서 새 버전으로 배포해 주세요.');
     else throw new Error(res&&res.error||'unknown');
@@ -2285,6 +2291,60 @@ function setStickyTop(){
   document.documentElement.style.setProperty('--stickytop',(tb?tb.offsetHeight:72)+'px');
 }
 window.addEventListener('resize',setStickyTop);
+
+/* ============================================================
+   변경 자동 반영 : 화면에서 일정·설정을 추가·수정·삭제하면 잠시 뒤
+   자동으로 구글시트에 [시트에 반영]과 같은 쓰기를 수행한다.
+   - 기준(lastPushed)은 시트와 일치한 순간(불러오기·반영 성공)에 갱신
+   - 비밀번호 입력을 취소하면 이 창에서는 자동 반영을 끄고,
+     [시트에 반영] 버튼에 "반영 안 됨" 배지로 표시만 한다
+   ============================================================ */
+const pushCore=()=>JSON.stringify({terms:state.terms,user:state.user,targetWeeks:state.targetWeeks,
+  feedback:state.feedback,priority:state.priority,lockYear:state.lockYear});
+let lastPushed=null;          // 마지막으로 시트와 일치했던 핵심 상태 (null = 기준 없음 → 자동 반영 안 함)
+let autoPushOff=false;        // 비밀번호 취소 시 이 세션에서는 자동 반영 중단
+let autoPushTimer=null,autoPushing=false;
+function markSheetSynced(){lastPushed=pushCore();updateSyncBadge();}
+function updateSyncBadge(){
+  const b=$('#btnSheetPush');if(!b)return;
+  b.classList.toggle('needsync',lastPushed!==null&&pushCore()!==lastPushed);
+}
+function scheduleAutoPush(){
+  updateSyncBadge();
+  if(autoPushOff||lastPushed===null||pushCore()===lastPushed)return;
+  clearTimeout(autoPushTimer);
+  autoPushTimer=setTimeout(autoPush,1500);
+}
+async function autoPush(){
+  if(autoPushing){scheduleAutoPush();return;}
+  if(autoPushOff||lastPushed===null||pushCore()===lastPushed)return;
+  const url=await findSubmitUrl();
+  if(!url)return;                       // 접수 스크립트 미설정 — 수동 [시트에 반영]만 가능
+  if(!sheetPwPlain){
+    const pw=prompt('변경 사항을 구글시트에 자동 반영합니다 — 관리자 비밀번호를 입력하세요.\n(취소하면 이 창에서는 자동 반영이 꺼지고, [시트에 반영] 버튼으로 직접 반영해야 합니다)');
+    if(pw===null){
+      autoPushOff=true;updateSyncBadge();
+      toast('자동 반영을 껐습니다 — 변경 사항은 [시트에 반영]으로 직접 반영하세요');
+      return;
+    }
+    sheetPwPlain=pw;
+  }
+  autoPushing=true;
+  const snapshot=pushCore();
+  try{
+    const r=await fetch(url,{method:'POST',redirect:'follow',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'replace',pw:sheetPwPlain,
+        data:{year:state.year,sem:state.sem,terms:state.terms,user:state.user,
+              targetWeeks:state.targetWeeks,feedback:state.feedback,priority:state.priority,
+              lockYear:state.lockYear}})});
+    const res=await r.json();
+    if(res&&res.ok){lastPushed=snapshot;updateSyncBadge();toast('변경 사항을 구글시트에 반영했습니다');}
+    else if(res&&res.error==='bad_pw'){sheetPwPlain=null;toast('비밀번호가 달라 자동 반영하지 못했습니다 — 다음 변경 때 다시 확인합니다');}
+    else toast('자동 반영 실패 — [시트에 반영]으로 직접 반영해 주세요');
+  }catch(e){toast('자동 반영 실패(네트워크) — [시트에 반영]으로 직접 반영해 주세요');}
+  finally{autoPushing=false;scheduleAutoPush();}   // 반영 중 추가 변경이 있었으면 이어서 반영
+}
 
 /* 초기 렌더 */
 const HAS_SAVED=!!localStorage.getItem(LS_KEY);
