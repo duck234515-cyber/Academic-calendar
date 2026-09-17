@@ -70,6 +70,10 @@
   }
   .srcline{text-align:center;font-size:12.5px;color:var(--faint);margin-bottom:16px}
   .srcline b{color:var(--muted)}
+  .srcline .syncbtn{margin-left:8px;border:1px solid var(--line-strong);background:var(--surface);color:var(--muted);
+    border-radius:999px;padding:2px 10px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;vertical-align:1px}
+  .srcline .syncbtn:hover{border-color:var(--brand);color:var(--brand)}
+  .srcline .syncbtn:disabled{opacity:.5;cursor:default}
 
   /* 관리자 게시 배너 (아티팩트에서 소유자에게만 의미 있음) */
   .pubbar{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
@@ -354,7 +358,7 @@
     <select id="ySel"></select>
     <button class="arrow" id="yNext" title="다음 학년도">▶</button>
   </div>
-  <div class="srcline" id="srcline"></div>
+  <div class="srcline"><span id="srcline"></span><button id="btnSync" class="syncbtn no-print" title="구글시트에서 최신 학사일정을 지금 바로 다시 불러옵니다">↻ 동기화</button></div>
   <div class="priobar no-print" id="priobar" hidden></div>
   <div class="searchbar no-print">
     <svg class="icon si" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg>
@@ -544,8 +548,11 @@ async function fetchCsvRows(url){
 const errMsg=e=>e&&e.name==='AbortError'?'시간초과':String(e&&e.message||e);
 /* 시트 행 읽기 : ① 웹에 게시 CSV → ② gviz CSV → ③ gviz JSONP
    — 모두 실패하면 경로별 원인을 담아 throw. 의견 탭은 gviz만 사용(게시 CSV는 첫 탭 전용) */
-async function fetchSheetRows(sheetName){
+async function fetchSheetRows(sheetName,fresh){
   const errs=[];
+  if(fresh){   // 실시간 우선 — 게시 CSV의 최대 5분 지연을 피해야 할 때([동기화] 버튼 등)
+    try{return await loadSheetJsonp(sheetName);}catch(e){errs.push('실시간: '+errMsg(e));}
+  }
   if(!sheetName&&PUB_CSV_URL){
     try{return await fetchCsvRows(`${PUB_CSV_URL}&nc=${Date.now()}`);}
     catch(e){errs.push('게시CSV: '+errMsg(e));}
@@ -562,10 +569,10 @@ async function fetchSheetRows(sheetName){
   }
 }
 let SHEET_ERR='';   // 시트 읽기 실패 원인 (출처 줄에 표시)
-async function loadSheet(){
+async function loadSheet(fresh){
   if(!SHEET_ID)return null;
   try{
-    const rows=await fetchSheetRows('');
+    const rows=await fetchSheetRows('',fresh);
     const d=sheetToData(rows);
     if(!d){
       // 무엇이 돌아왔는지 그대로 보여줘 원인을 특정 (HTML 무해화: 꺾쇠 치환)
@@ -577,10 +584,10 @@ async function loadSheet(){
     return d;
   }catch(e){SHEET_ERR=String(e&&e.message||e).replace(/[<>]/g,'');return null;}
 }
-async function loadData(){
+async function loadData(fresh){
   const fromHash=decodeShare();
   if(fromHash)return{d:fromHash,src:'공유 링크에 담긴 데이터',hash:true};
-  const sheet=await loadSheet();
+  const sheet=await loadSheet(fresh);
   if(sheet){
     // 비밀번호해시 행이 시트에 없으면 게시본·data.json 값으로 보충
     if(!sheet.adminPwHash){try{const emb=embeddedData();if(emb&&emb.adminPwHash)sheet.adminPwHash=emb.adminPwHash;}catch(e){}}
@@ -1405,7 +1412,7 @@ document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{V.view=b.dat
 $('#ySel').onchange=e=>{V.year=+e.target.value;render();};
 $('#yPrev').onclick=()=>{if(V.year>YEARS[0]){V.year--;render();}};
 $('#yNext').onclick=()=>{if(V.year<YEARS[YEARS.length-1]){V.year++;render();}};
-window.addEventListener('hashchange',()=>{const d=decodeShare();if(d){D=d;V.year=initialYear();$('#srcline').innerHTML=srcLine('공유 링크에 담긴 데이터');render();setupPublish(d);setupFeedback();}});
+window.addEventListener('hashchange',()=>{const d=decodeShare();if(d){D=d;V.year=initialYear();$('#srcline').innerHTML=srcLine('공유 링크에 담긴 데이터');const b=$('#btnSync');if(b)b.hidden=true;render();setupPublish(d);setupFeedback();}});
 
 function srcLine(src){
   const upd=D.updated?` · 마지막 수정 <b>${D.updated}</b>`:'';
@@ -1468,6 +1475,23 @@ async function setupPublish(hashData){
   };
 }
 
+/* 시트 데이터 다시 읽어 화면 갱신 — 실시간 경로 사용, 보던 학년도(V.year)는 유지 */
+let lastLoadTs=Date.now();
+async function refreshData(){
+  lastLoadTs=Date.now();
+  const{d,src}=await loadData(true);
+  D=d;
+  $('#srcline').innerHTML=srcLine(src);
+  render();
+  setupFeedback();
+}
+async function manualSync(){
+  const b=$('#btnSync');
+  if(b){b.disabled=true;b.textContent='동기화 중…';}
+  try{await refreshData();}catch(e){}
+  finally{if(b){b.disabled=false;b.textContent='↻ 동기화';}}
+}
+
 (async()=>{
   const{d,src,hash}=await loadData();
   D=d;
@@ -1476,22 +1500,16 @@ async function setupPublish(hashData){
   render();
   setupPublish(hash?d:null);
   setupFeedback();
+  const b=$('#btnSync');
+  if(b){b.hidden=!!hash;b.onclick=manualSync;}    // 공유 링크 보기에서는 숨김
 })();
 
-/* 탭에 다시 돌아왔을 때 5분 이상 지났으면 시트 데이터를 다시 읽어 화면을 갱신
+/* 탭에 다시 돌아왔을 때 5분 이상 지났으면 자동으로 다시 읽기
    — 열어둔 뷰어에도 승인된 일정 변경이 자동으로 반영되게 한다 */
-let lastLoadTs=Date.now();
-document.addEventListener('visibilitychange',async()=>{
+document.addEventListener('visibilitychange',()=>{
   if(document.hidden||decodeShare())return;      // 공유 링크 보기는 그대로 둔다
   if(Date.now()-lastLoadTs<5*60*1000)return;
-  lastLoadTs=Date.now();
-  try{
-    const{d,src}=await loadData();
-    D=d;
-    $('#srcline').innerHTML=srcLine(src);
-    render();                                     // 사용자가 보던 학년도(V.year)는 유지
-    setupFeedback();
-  }catch(e){}
+  refreshData().catch(()=>{});
 });
 </script>
 </body>
