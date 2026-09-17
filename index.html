@@ -1413,7 +1413,9 @@ async function sha256hex(s){
   return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
 }
 async function goAdmin(){
-  try{if(sessionStorage.getItem(ADMIN_KEY)==='1'){location.href='generator.html';return;}}catch(e){}
+  /* 캐시 우회 주소로 이동 — 브라우저가 옛 generator.html을 재사용해 기능이 빠져 보이는 문제 방지 */
+  const genUrl=()=>'generator.html?nc='+Date.now();
+  try{if(sessionStorage.getItem(ADMIN_KEY)==='1'){location.href=genUrl();return;}}catch(e){}
   const pw=prompt('관리자 비밀번호를 입력하세요');
   if(pw===null)return;
   if(!(window.crypto&&crypto.subtle)){alert('이 기능은 https 환경에서만 사용할 수 있습니다');return;}
@@ -1422,7 +1424,7 @@ async function goAdmin(){
   try{ok=(await sha256hex(pw))===hash;}catch(e){}
   if(ok){
     try{sessionStorage.setItem(ADMIN_KEY,'1');}catch(e){}
-    location.href='generator.html';
+    location.href=genUrl();
   }else alert('비밀번호가 올바르지 않습니다');
 }
 $('#btnAdmin').onclick=goAdmin;
