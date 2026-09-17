@@ -82,6 +82,34 @@
   .pubbar button:hover{background:var(--brand-dark)}
   .pubbar button:disabled{opacity:.5;cursor:default}
 
+  /* ---------- 우선 표시 안내 배너 (시트 [우선표시] 행) ---------- */
+  .priobar{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+    background:var(--brand-soft);border:1.5px solid var(--brand);color:var(--brand-dark);
+    border-radius:12px;padding:10px 16px;margin:0 0 14px;font-size:13.5px;font-weight:700}
+  .priobar button{border:0;border-radius:9px;background:var(--brand);color:#fff;cursor:pointer;
+    font-family:inherit;font-size:13px;font-weight:800;padding:7px 14px}
+  .priobar button:hover{background:var(--brand-dark)}
+
+  /* ---------- 학사일정 검색 ---------- */
+  .searchbar{position:relative;max-width:560px;margin:0 auto 14px}
+  .searchbar .si{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
+  .searchbar input{width:100%;box-sizing:border-box;padding:10px 14px 10px 36px;border:1.5px solid var(--line-strong);
+    border-radius:12px;font-family:inherit;font-size:14px;background:var(--surface)}
+  .searchbar input:focus{outline:none;border-color:var(--brand)}
+  .sres{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:40;background:var(--surface);
+    border:1.5px solid var(--line-strong);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.12);
+    max-height:340px;overflow:auto;padding:6px}
+  .sres .srow{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;text-align:left;
+    font-family:inherit;font-size:13.5px;padding:8px 10px;border-radius:9px;cursor:pointer}
+  .sres .srow:hover{background:var(--brand-soft)}
+  .sres .sy{flex:0 0 auto;font-size:11.5px;font-weight:900;color:var(--brand-dark);background:var(--brand-soft);
+    border-radius:6px;padding:2px 7px}
+  .sres .sd{flex:0 0 auto;font-weight:800;color:var(--brand-dark);min-width:86px}
+  .sres .snm{flex:1 1 auto;font-weight:700}
+  .sres .sk{flex:0 0 auto;margin-left:auto;font-size:11.5px;color:var(--faint)}
+  .sres .none{padding:10px;text-align:center}
+  table.cal td.hl{outline:2.5px dashed var(--exam);outline-offset:-2.5px;border-radius:4px}
+
   .semcards{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px}
   @media (max-width:860px){.semcards{grid-template-columns:1fr}}
   .semcard{background:var(--surface);border:1.5px solid var(--line-strong);border-radius:14px;overflow:hidden}
@@ -323,6 +351,12 @@
     <button class="arrow" id="yNext" title="다음 학년도">▶</button>
   </div>
   <div class="srcline" id="srcline"></div>
+  <div class="priobar no-print" id="priobar" hidden></div>
+  <div class="searchbar no-print">
+    <svg class="icon si" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg>
+    <input id="q" type="search" autocomplete="off" placeholder="학사일정 검색 — 일정명·분류·날짜 (예: 중간고사, 휴업일, 10-03)">
+    <div class="sres" id="sres" hidden></div>
+  </div>
   <div class="pubbar" id="pubbar" hidden></div>
   <div class="fbbar" id="fbbar" hidden></div>
   <div class="fbmodal" id="fbmodal" hidden></div>
@@ -385,7 +419,7 @@ function embeddedData(){
 /* 비교·게시용 핵심 필드만 추출 (관리자 비밀번호 해시 포함 — 게시 시 함께 배포) */
 const coreOf=d=>({year:d.year,sem:d.sem,terms:d.terms||{},overrides:d.overrides||{},
                   user:d.user||{},targetWeeks:d.targetWeeks||15,adminPwHash:d.adminPwHash||'',
-                  lockYear:d.lockYear!==false,feedback:d.feedback||null});
+                  lockYear:d.lockYear!==false,feedback:d.feedback||null,priority:d.priority||null});
 /* 구글시트 CSV 로드·해석 : 행 첫 칸(종류)으로 구분 — 학년도/표시학기/주차/의견수렴/학기/일정
    모르는 종류(메모, 제목행 등)는 무시. 날짜는 2027-04-19 · 2027.4.19 · 4/19/2027 형식 허용 */
 function parseCSV(txt){
@@ -426,6 +460,12 @@ function sheetToData(rows){
     else if(t==='의견수렴'){
       const s=normDateCell(r[2]),e=normDateCell(r[3]);
       if(s&&e)d.feedback={start:s<=e?s:e,end:s<=e?e:s};
+    }else if(t==='우선표시'){
+      // B열 학년도, C·D열 시작·종료일(둘 다 비우면 상시) — 기간 중 그 학년도를 기본 표시
+      const y=+String(r[1]||'').trim();
+      let s=normDateCell(r[2]),e=normDateCell(r[3]);
+      if(s&&e&&s>e){const x=s;s=e;e=x;}
+      if(y>=2000&&y<=2100)d.priority={year:y,start:s,end:e};
     }else if(t==='제출주소'){
       const u=String(r[1]||'').trim();
       if(/^https:\/\/script\.google(usercontent)?\.com\//.test(u))d.submitUrl=u;
@@ -783,6 +823,26 @@ const dlabel=(s,e)=>{const ds=fromISO(s);return(e&&e!==s)?`${shortMD(ds)}~${shor
 const $=s=>document.querySelector(s);
 const todayISO=toISO(new Date());
 
+/* 학년도 기준(3월 시작)으로 해당 날짜가 속한 학년도 */
+const academicYearOf=iso=>{const[y,m]=iso.split('-').map(Number);return m>=3?y:y-1;};
+/* 시트 [우선표시] 행이 오늘 유효하면 반환 — 기간(비우면 상시) 중 그 학년도를 우선 안내 */
+function priorityInfo(){
+  const p=D.priority;
+  if(!p||!p.year||!YEARS.includes(p.year))return null;
+  if(p.start&&todayISO<p.start)return null;
+  if(p.end&&todayISO>p.end)return null;
+  return p;
+}
+/* 처음 보여줄 학년도 : 우선표시 → (연도잠금 시) 게시 학년도 → 오늘이 속한 학년도 → 게시 학년도 */
+function initialYear(){
+  const p=priorityInfo();
+  if(p)return p.year;
+  if(D.lockYear!==false)return D.year&&YEARS.includes(D.year)?D.year:V.year;
+  const cur=academicYearOf(todayISO);
+  if(YEARS.includes(cur)&&hasInput(cur))return cur;
+  return D.year&&YEARS.includes(D.year)?D.year:V.year;
+}
+
 function hasInput(year){
   return !!((D.terms&&(D.terms[`${year}-1`]||D.terms[`${year}-2`]))||
             (D.user&&((D.user[`${year}-1`]||[]).length||(D.user[`${year}-2`]||[]).length)));
@@ -791,7 +851,11 @@ function hasInput(year){
 function renderYearNav(){
   /* 관리자가 학년도를 고정(lockYear)하면 그 학년도만 표시하고 연도 이동을 숨김 */
   const locked=D.lockYear!==false;
-  if(locked&&D.year&&YEARS.includes(D.year))V.year=D.year;
+  if(locked){
+    const p=priorityInfo();               // 잠금 중에도 [우선표시] 기간에는 그 학년도를 보여준다
+    const fy=(p&&p.year)||D.year;
+    if(fy&&YEARS.includes(fy))V.year=fy;
+  }
   $('#yPrev').hidden=locked;
   $('#yNext').hidden=locked;
   $('#ySel').hidden=locked;
@@ -886,7 +950,7 @@ function renderCalendar(){
       if(ev)labels.push(...ev.names);
       let lbl=labels.map(l=>`<span class="lbl">${l}</span>`).join('');
       if(ev&&ev.adm)lbl+=ev.adm.map(l=>`<span class="lbl adm-lbl">${l}</span>`).join('');
-      cells+=`<td class="${c.join(' ')}"><span class="n">${dd}</span>${lbl}</td>`;
+      cells+=`<td class="${c.join(' ')}" data-iso="${iso}"><span class="n">${dd}</span>${lbl}</td>`;
       if(wd===6&&dd<dim)cells+='</tr><tr>';
     }
     for(let i=new Date(yy,mm,dim).getDay()+1;i<7;i++)cells+='<td class="out"></td>';
@@ -1036,8 +1100,25 @@ function renderList(){
   $('#viewList').innerHTML=html;
 }
 
+function renderPrioBar(){
+  const bar=$('#priobar');if(!bar)return;
+  const p=priorityInfo();
+  if(!p){bar.hidden=true;return;}
+  const period=p.start&&p.end?` (${p.start} ~ ${p.end})`:'';
+  const cur=academicYearOf(todayISO);
+  let btn='';
+  if(D.lockYear===false){                 // 잠금 해제 시에만 연도 전환 버튼 제공
+    if(V.year!==p.year)btn=`<button id="prioGo" data-y="${p.year}">${p.year}학년도 보기</button>`;
+    else if(YEARS.includes(cur)&&cur!==p.year&&hasInput(cur))btn=`<button id="prioGo" data-y="${cur}">현재(${cur}학년도) 일정 보기</button>`;
+  }
+  bar.innerHTML=`<span>📌 <b>${p.year}학년도 학사일정</b>을 우선 안내하고 있습니다${period}.</span>${btn}`;
+  bar.hidden=false;
+  const b=$('#prioGo');if(b)b.onclick=()=>{V.year=+b.dataset.y;render();};
+}
+
 function render(){
   renderYearNav();
+  renderPrioBar();
   renderSemCards();
   renderCalendar();
   renderTable();
@@ -1046,6 +1127,68 @@ function render(){
   $('#viewTable').hidden=V.view!=='table';
   $('#viewList').hidden=V.view!=='list';
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.view===V.view));
+}
+
+/* ============================================================
+   3.4 학사일정 검색 : 입력된 모든 학년도의 일정을 이름·분류·날짜로 찾아
+      클릭 시 해당 학년도·월력으로 이동 (서버 없이 브라우저에서만 동작)
+   ============================================================ */
+const TYPE_LBL={hol:'공휴일·휴업일',off:'휴업일',exam:'시험',makeup:'보강',event:'행사',admin:'학사',term:'개강·종강'};
+function searchableYears(){
+  if(D.lockYear!==false){                 // 연도잠금 시 열람 가능한 학년도만 검색
+    const p=priorityInfo();
+    return[...new Set([D.year,p&&p.year].filter(y=>y&&YEARS.includes(y)))];
+  }
+  const ys=YEARS.filter(hasInput);
+  return ys.length?ys:(D.year&&YEARS.includes(D.year)?[D.year]:[]);
+}
+function doSearch(qRaw){
+  const q=qRaw.trim().toLowerCase();
+  if(!q)return[];
+  const out=[];
+  searchableYears().forEach(y=>{
+    calData(y).items.forEach(it=>{
+      const lbl=TYPE_LBL[it.type]||'';
+      if(it.name.toLowerCase().includes(q)||lbl.includes(q)||it.s.includes(q)||dlabel(it.s,it.e).includes(q))
+        out.push({y,...it});
+    });
+  });
+  out.sort((a,b)=>a.s<b.s?-1:(a.s>b.s?1:0));
+  return out.slice(0,40);
+}
+function jumpTo(y,iso){
+  V.year=y;V.view='cal';render();
+  closeSearch();
+  const d=fromISO(iso);
+  const cell=document.querySelector(`#viewCal td[data-iso="${iso}"]`);
+  const target=cell||document.getElementById(`m-${d.getFullYear()}-${d.getMonth()+1}`);
+  if(target){
+    target.scrollIntoView({behavior:'smooth',block:'center'});
+    if(cell){cell.classList.add('hl');setTimeout(()=>cell.classList.remove('hl'),2600);}
+  }
+}
+let sResults=[];
+function renderSearch(){
+  const box=$('#sres'),q=$('#q').value;
+  if(!q.trim()){box.hidden=true;return;}
+  sResults=doSearch(q);
+  box.innerHTML=sResults.length
+    ?sResults.map((it,i)=>`<button class="srow" data-i="${i}"><span class="sy">${it.y}학년도</span><span class="sd">${dlabel(it.s,it.e)}</span><span class="snm">${it.name}</span><span class="sk">${TYPE_LBL[it.type]||''}</span></button>`).join('')
+    :'<div class="none">— 검색 결과가 없습니다 —</div>';
+  box.hidden=false;
+  box.querySelectorAll('.srow').forEach(b=>b.onclick=()=>{const it=sResults[+b.dataset.i];jumpTo(it.y,it.s);});
+}
+function closeSearch(){$('#sres').hidden=true;}
+{
+  const q=$('#q');
+  let deb=null;
+  q.oninput=()=>{clearTimeout(deb);deb=setTimeout(renderSearch,120);};
+  q.onfocus=()=>{if(q.value.trim())renderSearch();};
+  q.onkeydown=e=>{
+    if(e.key==='Enter'){renderSearch();if(sResults.length)jumpTo(sResults[0].y,sResults[0].s);}
+    else if(e.key==='Escape'){q.blur();closeSearch();}
+  };
+  document.addEventListener('click',e=>{if(!e.target.closest('.searchbar'))closeSearch();});
 }
 
 /* ============================================================
@@ -1313,7 +1456,7 @@ document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{V.view=b.dat
 $('#ySel').onchange=e=>{V.year=+e.target.value;render();};
 $('#yPrev').onclick=()=>{if(V.year>YEARS[0]){V.year--;render();}};
 $('#yNext').onclick=()=>{if(V.year<YEARS[YEARS.length-1]){V.year++;render();}};
-window.addEventListener('hashchange',()=>{const d=decodeShare();if(d){D=d;if(D.year)V.year=D.year;$('#srcline').innerHTML=srcLine('공유 링크에 담긴 데이터');render();setupPublish(d);setupFeedback();}});
+window.addEventListener('hashchange',()=>{const d=decodeShare();if(d){D=d;V.year=initialYear();$('#srcline').innerHTML=srcLine('공유 링크에 담긴 데이터');render();setupPublish(d);setupFeedback();}});
 
 function srcLine(src){
   const upd=D.updated?` · 마지막 수정 <b>${D.updated}</b>`:'';
@@ -1379,7 +1522,7 @@ async function setupPublish(hashData){
 (async()=>{
   const{d,src,hash}=await loadData();
   D=d;
-  if(D.year&&YEARS.includes(D.year))V.year=D.year;
+  V.year=initialYear();
   $('#srcline').innerHTML=srcLine(src);
   render();
   setupPublish(hash?d:null);
