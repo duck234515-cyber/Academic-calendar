@@ -151,6 +151,8 @@ function replaceData(req) {
     rows.push(['주차', String(d.targetWeeks || 15), '', '', '', '']);
     var fb = d.feedback || {};
     rows.push(['의견수렴', '', fb.start || '', fb.end || '', '', '']);
+    var pr = d.priority || {};
+    if (pr.year) rows.push(['우선표시', String(pr.year), pr.start || '', pr.end || '', '', '']);
     rows.push(['연도잠금', d.lockYear === false ? '0' : '1', '', '', '', '']);
     Object.keys(d.terms).sort().forEach(function (k) {
       var t = d.terms[k] || {};
