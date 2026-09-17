@@ -454,6 +454,17 @@ function normDateCell(s){
   if(m)return `${m[3]}-${pad(+m[1])}-${pad(+m[2])}`;
   return null;
 }
+/* 학기키 복원 : 시트가 '2027-1'을 날짜로 자동 변환해 'Fri Jan 01 2027'·'2027-01-01' 등으로
+   저장한 경우에도 '2027-1' 형태로 되돌려 읽는다 (1·2월만 학기로 인정) */
+function normTermKey(s){
+  s=String(s||'').trim();
+  if(/^\d{4}-[12]$/.test(s))return s;
+  const m=s.match(/^(\d{4})\D+([12])\D*$/);
+  if(m)return `${m[1]}-${m[2]}`;
+  const d=new Date(s);
+  if(!isNaN(d)&&(d.getMonth()===0||d.getMonth()===1))return `${d.getFullYear()}-${d.getMonth()+1}`;
+  return s;
+}
 function sheetToData(rows){
   const KIND={'휴업일':'off','휴업':'off','공휴일':'off','시험':'exam','보강':'makeup','행사':'event','학사':'admin',
               'off':'off','exam':'exam','makeup':'makeup','event':'event','admin':'admin'};
@@ -483,10 +494,10 @@ function sheetToData(rows){
       const v=String(r[1]||'').trim();
       d.lockYear=!(v==='0'||v==='해제'||v==='전체');  // 0/해제/전체 = 모든 연도 열람 허용
     }else if(t==='학기'){
-      const k=String(r[1]||'').trim(),s=normDateCell(r[2]),e=normDateCell(r[3]);
+      const k=normTermKey(r[1]),s=normDateCell(r[2]),e=normDateCell(r[3]);
       if(/^\d{4}-[12]$/.test(k)&&s&&e)d.terms[k]={start:s,end:e};
     }else if(t==='일정'){
-      const k=String(r[1]||'').trim(),s=normDateCell(r[2]);let e=normDateCell(r[3]);
+      const k=normTermKey(r[1]),s=normDateCell(r[2]);let e=normDateCell(r[3]);
       const name=String(r[4]||'').trim(),kind=KIND[String(r[5]||'').trim()]||'admin';
       if(!/^\d{4}-[12]$/.test(k)||!s||!name)return;
       if(!e||e<s)e=s;
@@ -569,20 +580,29 @@ async function fetchSheetRows(sheetName,fresh){
   }
 }
 let SHEET_ERR='';   // 시트 읽기 실패 원인 (출처 줄에 표시)
+/* 경로를 순서대로 시도하되, "형식 인식까지 성공"해야 채택 —
+   삭제된 탭의 게시 CSV처럼 200이지만 빈/엉뚱한 응답이 와도 다음 경로로 넘어간다 */
 async function loadSheet(fresh){
   if(!SHEET_ID)return null;
-  try{
-    const rows=await fetchSheetRows('',fresh);
-    const d=sheetToData(rows);
-    if(!d){
-      // 무엇이 돌아왔는지 그대로 보여줘 원인을 특정 (HTML 무해화: 꺾쇠 치환)
-      const head=String(rows._raw||'').slice(0,150).replace(/\s+/g,' ')
+  const errs=[];
+  const paths=[];
+  const jsonp=['실시간',()=>loadSheetJsonp('')];
+  if(fresh)paths.push(jsonp);
+  if(PUB_CSV_URL)paths.push(['게시CSV',()=>fetchCsvRows(`${PUB_CSV_URL}&nc=${Date.now()}`)]);
+  paths.push(['CSV',()=>fetchCsvRows(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&nc=${Date.now()}`)]);
+  if(!fresh)paths.push(jsonp);
+  for(const[label,get]of paths){
+    try{
+      const rows=await get();
+      const d=sheetToData(rows);
+      if(d){SHEET_ERR='';return d;}
+      const head=String(rows._raw||'').slice(0,100).replace(/\s+/g,' ')
                  .replace(/[<>&]/g,c=>({'<':'‹','>':'›','&':'＆'}[c]));
-      SHEET_ERR='시트 형식 인식 실패'+(rows._ct?` · 응답형식: ${rows._ct.split(';')[0]}`:'')
-               +(head?` · 응답 시작: ${head}`:' · 빈 응답');
-    }
-    return d;
-  }catch(e){SHEET_ERR=String(e&&e.message||e).replace(/[<>]/g,'');return null;}
+      errs.push(`${label}: 형식 인식 실패${rows&&rows.length?(head?` · 응답 시작: ${head}`:` · ${rows.length}행`):' · 빈 응답'}`);
+    }catch(e){errs.push(`${label}: ${errMsg(e)}`);}
+  }
+  SHEET_ERR=errs.join(' · ').replace(/[<>]/g,'');
+  return null;
 }
 async function loadData(fresh){
   const fromHash=decodeShare();

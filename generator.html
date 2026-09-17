@@ -2025,6 +2025,16 @@ function normDateCellg(s){
   if(m)return `${m[3]}-${pad(+m[1])}-${pad(+m[2])}`;
   return null;
 }
+/* 학기키 복원 : 'Fri Jan 01 2027'·'2027-01-01' 등 날짜로 변환된 값도 '2027-1'로 되돌린다 */
+function normTermKeyG(s){
+  s=String(s||'').trim();
+  if(/^\d{4}-[12]$/.test(s))return s;
+  const m=s.match(/^(\d{4})\D+([12])\D*$/);
+  if(m)return `${m[1]}-${m[2]}`;
+  const d=new Date(s);
+  if(!isNaN(d)&&(d.getMonth()===0||d.getMonth()===1))return `${d.getFullYear()}-${d.getMonth()+1}`;
+  return s;
+}
 function sheetRowsToState(rows){
   const KIND={'휴업일':'off','휴업':'off','공휴일':'off','시험':'exam','보강':'makeup','행사':'event','학사':'admin',
               'off':'off','exam':'exam','makeup':'makeup','event':'event','admin':'admin'};
@@ -2050,10 +2060,10 @@ function sheetRowsToState(rows){
       const v=String(r[1]||'').trim();
       d.lockYear=!(v==='0'||v==='해제'||v==='전체');
     }else if(t==='학기'){
-      const k=String(r[1]||'').trim(),s=normDateCellg(r[2]),e=normDateCellg(r[3]);
+      const k=normTermKeyG(r[1]),s=normDateCellg(r[2]),e=normDateCellg(r[3]);
       if(/^\d{4}-[12]$/.test(k)&&s&&e)d.terms[k]={start:s,end:e};
     }else if(t==='일정'){
-      const k=String(r[1]||'').trim(),s=normDateCellg(r[2]);let e=normDateCellg(r[3]);
+      const k=normTermKeyG(r[1]),s=normDateCellg(r[2]);let e=normDateCellg(r[3]);
       const name=String(r[4]||'').trim(),kind=KIND[String(r[5]||'').trim()]||'admin';
       if(!/^\d{4}-[12]$/.test(k)||!s||!name)return;
       if(!e||e<s)e=s;
@@ -2101,19 +2111,27 @@ function loadSheetJsonpG(sheetName){
 }
 async function fetchSheetRowsG(sheetName,fresh){
   if(fresh){                            // 실시간 우선 — 게시 CSV의 최대 5분 지연을 피해야 할 때(반영 직후 등)
-    try{return await loadSheetJsonpG(sheetName);}catch(e){}
+    try{
+      const rows=await loadSheetJsonpG(sheetName);
+      if(rows.length)return rows;
+    }catch(e){}
   }
-  if(!sheetName&&PUB_CSV_URL){          // 게시 CSV는 첫 탭 전용
+  if(!sheetName&&PUB_CSV_URL){          // 게시 CSV는 첫 탭 전용 — 빈 응답(삭제된 탭 등)이면 다음 경로로
     try{
       const r=await fetch(`${PUB_CSV_URL}&nc=${Date.now()}`,{cache:'no-store'});
-      if(r.ok)return parseCSVg(await r.text());
+      if(r.ok){
+        const rows=parseCSVg(await r.text());
+        if(rows.length)return rows;
+      }
     }catch(e){}
   }
   try{
     const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`+
       (sheetName?`&sheet=${encodeURIComponent(sheetName)}`:'')+`&nc=${Date.now()}`,{cache:'no-store'});
     if(!r.ok)throw 0;
-    return parseCSVg(await r.text());
+    const rows=parseCSVg(await r.text());
+    if(!rows.length)throw 0;
+    return rows;
   }catch(e){
     return await loadSheetJsonpG(sheetName);   // fetch가 CORS 등으로 막히면 JSONP로 재시도
   }
