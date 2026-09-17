@@ -761,9 +761,10 @@ window.AC_PW_HASH_P=(async function(){
         <p class="hint" id="fbPeriodLine" style="margin-top:0;margin-bottom:10px"></p>
         <div style="display:flex;gap:8px;margin-bottom:10px">
           <button class="btn" id="btnFbPeriod" style="flex:1;justify-content:center">기간 설정</button>
-          <button class="btn" id="btnOpLoad" style="flex:1;justify-content:center">의견 파일 불러오기</button>
+          <button class="btn primary" id="btnOpSheet" style="flex:1;justify-content:center" title="부서가 제출한 의견을 시트의 의견 탭에서 불러와 건별로 반영·반려합니다">의견 검토</button>
+          <button class="btn" id="btnOpLoad" style="flex:1;justify-content:center">파일 불러오기</button>
         </div>
-        <p class="hint" style="margin:0 0 10px">기간을 설정하고 <b>게시</b>(뷰어 [지금 게시] 또는 data.json 교체)하면, 기간 중 뷰어에 <b>[의견 제출]</b> 버튼이 나타납니다. 각 부서가 저장해 보낸 의견 파일(.json)을 불러와 아래에서 건별로 <b>반영</b>하세요.</p>
+        <p class="hint" style="margin:0 0 10px">기간을 설정하고 <b>[시트에 반영]</b>하면 기간 중 뷰어에 <b>[의견 제출]</b> 버튼이 나타납니다. 제출된 의견은 <b>[의견 검토]</b>로 불러와 건별로 <b>반영·반려</b>하세요. (파일로 받은 의견은 [파일 불러오기])</p>
         <style>#opList .nm{white-space:normal;overflow:visible;text-overflow:unset;line-height:1.4}</style>
         <div class="itemlist" id="opList"></div>
       </div>
@@ -1783,6 +1784,7 @@ $('#btnData').onclick=()=>{
      불러와 목록으로 보여주고, 추가/수정/삭제 제안은 [반영] 한 번으로 적용
    ============================================================ */
 const escOp=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let sheetOps=[];   // 시트 '의견' 탭에서 불러온 대기 건 (저장하지 않음 — 시트가 원본)
 function renderOpinions(){
   const box=$('#opList'),line=$('#fbPeriodLine');
   if(!box||!line)return;
@@ -1790,9 +1792,28 @@ function renderOpinions(){
     ?`의견 수렴 기간 : <b>${state.feedback.start} ~ ${state.feedback.end}</b> <em>([시트에 반영]해야 뷰어에 적용)</em>`
     :'의견 수렴 기간이 <b>설정되지 않았습니다</b>';
   const ops=state.opinions||[];
-  $('#opCount').textContent=ops.filter(o=>o.status!=='done').length;
+  $('#opCount').textContent=sheetOps.length+ops.filter(o=>o.status!=='done').length;
   box.innerHTML='';
-  if(!ops.length){box.innerHTML='<div class="empty">불러온 의견이 없습니다</div>';return;}
+  if(!sheetOps.length&&!ops.length){box.innerHTML='<div class="empty">불러온 의견이 없습니다 — 제출된 의견은 [의견 검토]로 확인하세요</div>';return;}
+  /* --- 시트 접수 의견 (대기) : [반영]은 접수 스크립트가 구글시트를 직접 수정 --- */
+  const typeDotS={'추가':'#1b7a1b','수정':'#0b6e8f','삭제':'#E51400','기타':'#44546a'};
+  sheetOps.forEach(o=>{
+    const el=document.createElement('div');el.className='item';
+    const range=o.iso?(o.iso+(o.end&&o.end!==o.iso?'~'+o.end:'')):'';
+    let desc='';
+    if(o.type==='추가')desc=`${escOp(o.name)} · ${range}`;
+    else if(o.type==='수정')desc=`'${escOp(o.targetName)}' → ${o.name?escOp(o.name):'(명칭 유지)'}${range?' · '+range:''}`;
+    else if(o.type==='삭제')desc=`'${escOp(o.targetName)}' 삭제 요청`;
+    else desc=escOp(o.note);
+    const noteLine=(o.type!=='기타'&&o.note)?`<div class="dt">"${escOp(o.note)}"</div>`:'';
+    el.innerHTML=`
+      <span class="dot" style="background:${typeDotS[o.type]||'#888'}"></span>
+      <div class="meta"><div class="nm">[${escOp(o.dept||'무기명')}·${escOp(o.type)}] ${desc}</div>
+        <div class="dt">${escOp(o.term||'')} 학기 · ${escOp(o.ts||'')} 제출</div>${noteLine}</div>
+      ${o.type!=='기타'?`<button class="btn" style="padding:3px 9px;font-size:12px" data-sap="${o.row}">반영</button>`:''}
+      <button class="btn ghost" style="padding:3px 9px;font-size:12px" data-scl="${o.row}">${o.type==='기타'?'확인':'반려'}</button>`;
+    box.appendChild(el);
+  });
   const typeDot={add:'#1b7a1b',edit:'#0b6e8f',del:'#E51400',etc:'#44546a'};
   const typeLbl={add:'추가',edit:'수정',del:'삭제',etc:'의견'};
   ops.forEach(o=>{
@@ -1827,7 +1848,69 @@ function renderOpinions(){
   box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{
     state.opinions=ops.filter(x=>x.oid!==+b.dataset.rm);render();
   });
+  box.querySelectorAll('[data-sap]').forEach(b=>b.onclick=()=>{
+    const o=sheetOps.find(x=>x.row===+b.dataset.sap);
+    if(o)sheetOpAction(o,'apply',b);
+  });
+  box.querySelectorAll('[data-scl]').forEach(b=>b.onclick=()=>{
+    const o=sheetOps.find(x=>x.row===+b.dataset.scl);
+    if(o)sheetOpAction(o,'close',b);
+  });
 }
+/* 시트 '의견' 탭에서 대기 건 불러오기 */
+async function loadSheetOpinions(silent){
+  const url=await findSubmitUrl();
+  if(!url){
+    if(!silent)alert('접수 스크립트(제출주소)가 설정되지 않아 시트 의견을 불러올 수 없습니다.\nREADME의 [의견 바로 제출] 설치 안내를 참고하세요.');
+    return;
+  }
+  let rows;
+  try{rows=await fetchSheetRowsG('의견');}
+  catch(e){
+    if(!silent)toast('의견 탭을 읽지 못했습니다 — 아직 제출된 의견이 없을 수 있습니다');
+    sheetOps=[];renderOpinions();return;
+  }
+  // 열: 0제출일시 1부서명 2학기 3구분 4대상일정 5대상시작일 6제안명칭 7제안시작일 8제안종료일 9분류 10의견 11상태
+  sheetOps=[];
+  rows.forEach((r,i)=>{
+    if(i===0)return;                       // 머리글
+    if(String(r[11]||'').trim()!=='대기')return;
+    sheetOps.push({row:i+1,ts:r[0],dept:r[1],term:r[2],type:String(r[3]||'').trim(),
+      targetName:r[4],name:r[6],iso:normDateCellg(r[7])||r[7],end:normDateCellg(r[8])||r[8],note:r[10]});
+  });
+  renderOpinions();
+  if(!silent)toast(sheetOps.length?`대기 중인 의견 ${sheetOps.length}건을 불러왔습니다`:'대기 중인 의견이 없습니다');
+}
+/* [반영]/[반려] : 접수 스크립트가 시트를 직접 수정 — 반영 후 [시트에서 불러오기]로 화면 갱신 */
+async function sheetOpAction(o,act,btn){
+  const url=await findSubmitUrl();if(!url)return;
+  if(!sheetPwPlain){
+    const pw=prompt('관리자 비밀번호를 입력하세요 (접수 스크립트의 ADMIN_PW)');
+    if(pw===null)return;
+    sheetPwPlain=pw;
+  }
+  if(btn){btn.disabled=true;btn.textContent='처리 중…';}
+  try{
+    const r=await fetch(url,{method:'POST',redirect:'follow',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:act,pw:sheetPwPlain,row:o.row,ts:o.ts,dept:o.dept,status:'반려'})});
+    const res=await r.json();
+    if(res&&res.ok){
+      if(act==='apply')toast('구글시트에 반영되었습니다 — [시트에서 불러오기]를 누르면 이 화면에도 반영됩니다');
+      await loadSheetOpinions(true);
+    }else if(res&&res.error==='bad_pw'){
+      sheetPwPlain=null;renderOpinions();
+      alert('접수 스크립트의 관리자 비밀번호(ADMIN_PW)와 일치하지 않습니다.\nApps Script의 ADMIN_PW 설정을 확인해 주세요.');
+    }else{
+      renderOpinions();
+      alert('처리하지 못했습니다: '+(res&&res.error||'알 수 없는 오류'));
+    }
+  }catch(e){
+    renderOpinions();
+    alert('처리하지 못했습니다 — 잠시 후 다시 시도해 주세요\n\n[진단] '+(e&&e.message?e.message:e));
+  }
+}
+$('#btnOpSheet').onclick=()=>loadSheetOpinions(false);
 function applyOpinion(o){
   const k=o.term;
   if(!k){alert('의견에 학기 정보가 없어 자동 반영할 수 없습니다');return false;}
@@ -1979,7 +2062,7 @@ function gvizRowsFromJsonG(json){
   });
   return rows;
 }
-function loadSheetJsonpG(){
+function loadSheetJsonpG(sheetName){
   return new Promise((resolve,reject)=>{
     const cb='__gviz_cb_'+Math.random().toString(36).slice(2);
     const s=document.createElement('script');
@@ -1991,24 +2074,40 @@ function loadSheetJsonpG(){
       else resolve(gvizRowsFromJsonG(res));
     };
     s.onerror=()=>{cleanup();reject(new Error('load_error'));};
-    s.src=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}&nc=${Date.now()}`;
+    s.src=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json;responseHandler:${cb}`+
+          (sheetName?`&sheet=${encodeURIComponent(sheetName)}`:'')+`&nc=${Date.now()}`;
     document.head.appendChild(s);
   });
 }
-async function fetchSheetRowsG(){
-  if(PUB_CSV_URL){
+async function fetchSheetRowsG(sheetName){
+  if(!sheetName&&PUB_CSV_URL){          // 게시 CSV는 첫 탭 전용
     try{
       const r=await fetch(`${PUB_CSV_URL}&nc=${Date.now()}`,{cache:'no-store'});
       if(r.ok)return parseCSVg(await r.text());
     }catch(e){}
   }
   try{
-    const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&nc=${Date.now()}`,{cache:'no-store'});
+    const r=await fetch(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`+
+      (sheetName?`&sheet=${encodeURIComponent(sheetName)}`:'')+`&nc=${Date.now()}`,{cache:'no-store'});
     if(!r.ok)throw 0;
     return parseCSVg(await r.text());
   }catch(e){
-    return await loadSheetJsonpG();   // fetch가 CORS 등으로 막히면 JSONP로 재시도
+    return await loadSheetJsonpG(sheetName);   // fetch가 CORS 등으로 막히면 JSONP로 재시도
   }
+}
+/* 시트가 원본인 설정(의견수렴·우선표시·연도잠금·제출주소)은 열 때마다 시트 값으로 동기화
+   — 화면 표시와 뷰어 동작이 어긋나거나, [시트에 반영]이 시트의 설정 행을 지우는 일을 막는다 */
+async function syncSettingsFromSheet(){
+  if(!SHEET_ID)return;
+  try{
+    const d=sheetRowsToState(await fetchSheetRowsG());
+    if(!d)return;
+    state.feedback=d.feedback||null;
+    state.priority=d.priority||null;
+    if(d.lockYear!==undefined)state.lockYear=d.lockYear;
+    if(d.submitUrl)state.submitUrl=d.submitUrl;
+    saveState();render();
+  }catch(e){}
 }
 async function importFromSheet(silent){
   if(!SHEET_ID)return false;
@@ -2098,8 +2197,14 @@ loadState();
 render();
 setStickyTop();
 wireDatePickers();
-/* 이 브라우저에 저장된 입력값이 없으면(새 PC·새 브라우저) 시트에서 자동으로 불러오기 */
-if(!HAS_SAVED)importFromSheet(true);
+/* 이 브라우저에 저장된 입력값이 없으면(새 PC·새 브라우저) 시트에서 자동으로 불러오기.
+   저장된 입력값이 있어도 시트가 원본인 설정(의견수렴·우선표시·연도잠금)은 시트 값으로 맞추고,
+   대기 중인 부서 의견 건수를 배지에 표시한다 */
+(async()=>{
+  if(HAS_SAVED)await syncSettingsFromSheet();
+  else await importFromSheet(true);
+  if(SHEET_ID)loadSheetOpinions(true);
+})();
 </script>
 </body>
 </html>
