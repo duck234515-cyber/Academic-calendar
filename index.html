@@ -1476,6 +1476,22 @@ async function setupPublish(hashData){
   setupPublish(hash?d:null);
   setupFeedback();
 })();
+
+/* 탭에 다시 돌아왔을 때 5분 이상 지났으면 시트 데이터를 다시 읽어 화면을 갱신
+   — 열어둔 뷰어에도 승인된 일정 변경이 자동으로 반영되게 한다 */
+let lastLoadTs=Date.now();
+document.addEventListener('visibilitychange',async()=>{
+  if(document.hidden||decodeShare())return;      // 공유 링크 보기는 그대로 둔다
+  if(Date.now()-lastLoadTs<5*60*1000)return;
+  lastLoadTs=Date.now();
+  try{
+    const{d,src}=await loadData();
+    D=d;
+    $('#srcline').innerHTML=srcLine(src);
+    render();                                     // 사용자가 보던 학년도(V.year)는 유지
+    setupFeedback();
+  }catch(e){}
+});
 </script>
 </body>
 </html>
