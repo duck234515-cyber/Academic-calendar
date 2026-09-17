@@ -677,6 +677,10 @@ window.AC_PW_HASH_P=(async function(){
     </div>
   </div>
   <div class="field">
+    <label><svg class="icon" viewBox="0 0 24 24"><path d="M12 17v5M5 9c0-3.9 3.1-7 7-7s7 3.1 7 7c0 2.4-1.2 4.5-3 5.7V17H8v-2.3C6.2 13.5 5 11.4 5 9z"/></svg>우선 표시 (점검·안내 기간)</label>
+    <button class="btn" id="btnPrio" title="지정한 기간 동안 뷰어가 이 학년도를 먼저 보여주고 안내 배너를 띄웁니다"></button>
+  </div>
+  <div class="field">
     <label>&nbsp;</label>
     <button class="btn ghost" id="btnReset"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/></svg>이 학기 기본값</button>
   </div>
@@ -878,6 +882,7 @@ const state={
   uid:1,
   lockYear:true,            // 뷰어에 현재 학년도만 표시 (false = 전체 연도 열람 허용)
   feedback:null,            // 의견 수렴 기간 {start,end} — 게시하면 뷰어에 [의견 제출] 표시
+  priority:null,            // 우선 표시 {year,start,end} — 기간 중 뷰어가 그 학년도를 먼저 보여줌
   opinions:[],              // 부서가 보낸 의견 파일에서 불러온 항목 (생성기 로컬 전용)
 };
 
@@ -890,7 +895,7 @@ function saveState(){
       overrides:state.overrides, user:state.user,
       targetWeeks:state.targetWeeks, uid:state.uid,
       adminPwHash:state.adminPwHash, lockYear:state.lockYear,
-      feedback:state.feedback, opinions:state.opinions,
+      feedback:state.feedback, priority:state.priority, opinions:state.opinions,
       submitUrl:state.submitUrl
     }));
   }catch(e){}
@@ -899,7 +904,7 @@ function loadState(){
   try{
     const raw=localStorage.getItem(LS_KEY); if(!raw)return;
     const d=JSON.parse(raw);
-    ['year','sem','terms','overrides','user','targetWeeks','uid','adminPwHash','lockYear','feedback','opinions','submitUrl'].forEach(k=>{ if(d[k]!==undefined)state[k]=d[k]; });
+    ['year','sem','terms','overrides','user','targetWeeks','uid','adminPwHash','lockYear','feedback','priority','opinions','submitUrl'].forEach(k=>{ if(d[k]!==undefined)state[k]=d[k]; });
   }catch(e){}
 }
 
@@ -992,6 +997,13 @@ function renderControls(){
   y.value=state.year;
   document.querySelectorAll('#semSeg button').forEach(b=>b.classList.toggle('on',+b.dataset.sem===state.sem));
   document.querySelectorAll('#lockSeg button').forEach(b=>b.classList.toggle('on',(+b.dataset.lock===1)===(state.lockYear!==false)));
+  const pb=$('#btnPrio');
+  if(pb){
+    const p=state.priority;
+    pb.textContent=p&&p.year
+      ?`${p.year}학년도${p.start&&p.end?` · ${p.start.slice(5)}~${p.end.slice(5)}`:' · 상시'}`
+      :'미설정';
+  }
   const t=curTerm(); $('#start').value=t.start; $('#end').value=t.end;
   const tg=$('#target'); if(tg)tg.value=state.targetWeeks;
 }
@@ -1407,6 +1419,27 @@ document.querySelectorAll('#lockSeg button').forEach(b=>b.onclick=()=>{
   state.lockYear=+b.dataset.lock===1;render();
   toast(state.lockYear?'뷰어에 현재 학년도만 표시됩니다 — 게시해야 적용됩니다':'뷰어에서 전체 연도를 열람할 수 있습니다 — 게시해야 적용됩니다');
 });
+/* 우선 표시 : 지정 기간 동안 뷰어가 이 학년도를 먼저 보여주고 안내 배너를 띄움 */
+$('#btnPrio').onclick=()=>{
+  const p=state.priority;
+  const cur=p&&p.year?`${p.year}${p.start&&p.end?`, ${p.start} ~ ${p.end}`:''}`:'';
+  const txt=prompt(
+    '우선 표시할 학년도와 기간을 입력하세요.\n'+
+    '예: 2027, 2026-09-01 ~ 2026-10-31   (기간을 생략하면 상시 적용)\n'+
+    '빈칸으로 [확인]하면 우선 표시를 해제합니다.',cur);
+  if(txt===null)return;
+  if(!txt.trim()){state.priority=null;render();toast('우선 표시 해제 — [시트에 반영]을 눌러야 뷰어에 적용됩니다');return;}
+  const ym=txt.match(/\b(20\d{2})\b/);
+  if(!ym){alert('우선 표시할 학년도(예: 2027)를 찾지 못했습니다');return;}
+  const year=+ym[1];
+  const ds=(txt.slice(ym.index+4).match(/\d{4}-\d{1,2}-\d{1,2}/g)||[]);
+  const norm=s=>{const[y,m,d]=s.split('-');return`${y}-${pad(+m)}-${pad(+d)}`;};
+  let s=ds[0]?norm(ds[0]):null,e=ds[1]?norm(ds[1]):null;
+  if(s&&e&&s>e)[s,e]=[e,s];
+  state.priority={year,start:s,end:e};
+  render();
+  toast(`${year}학년도 우선 표시 설정됨 — [시트에 반영]을 눌러야 뷰어에 적용됩니다`);
+};
 /* ---- 날짜 자유 입력 파서 : 3/3 · 0303 · 20260303 · 2026-03-03 · 2026.3.3 · 2026년 3월 3일 ---- */
 function parseDateInput(v){
   if(!v)return null;
@@ -1653,7 +1686,7 @@ $('#btnXls').onclick=()=>{
 function exportViewerData(){
   const d={updated:toISO(new Date()),year:state.year,sem:state.sem,terms:state.terms,
            overrides:state.overrides,user:state.user,targetWeeks:state.targetWeeks,
-           lockYear:state.lockYear!==false,feedback:state.feedback||null};
+           lockYear:state.lockYear!==false,feedback:state.feedback||null,priority:state.priority||null};
   if(state.adminPwHash)d.adminPwHash=state.adminPwHash;
   return d;
 }
@@ -1674,7 +1707,7 @@ function parseImport(txt){
 }
 function applyImport(d){
   if(!confirm('가져온 데이터로 현재 입력값을 덮어쓸까요?\n(학년도·학기·개강종강일·일정·공휴일 설정이 모두 교체됩니다)'))return;
-  ['year','sem','terms','overrides','user','targetWeeks','adminPwHash','lockYear','feedback'].forEach(k=>{if(d[k]!==undefined)state[k]=d[k];});
+  ['year','sem','terms','overrides','user','targetWeeks','adminPwHash','lockYear','feedback','priority'].forEach(k=>{if(d[k]!==undefined)state[k]=d[k];});
   let mx=0;Object.values(state.user||{}).forEach(a=>(a||[]).forEach(u=>{if(+u.id>mx)mx=+u.id;}));
   state.uid=mx+1;
   render();
@@ -1902,6 +1935,11 @@ function sheetRowsToState(rows){
     else if(t==='의견수렴'){
       const s=normDateCellg(r[2]),e=normDateCellg(r[3]);
       if(s&&e)d.feedback={start:s<=e?s:e,end:s<=e?e:s};
+    }else if(t==='우선표시'){
+      const y=+String(r[1]||'').trim();
+      let s=normDateCellg(r[2]),e=normDateCellg(r[3]);
+      if(s&&e&&s>e){const x=s;s=e;e=x;}
+      if(y>=2000&&y<=2100)d.priority={year:y,start:s,end:e};
     }else if(t==='제출주소'){
       const u=String(r[1]||'').trim();
       if(/^https:\/\/script\.google(usercontent)?\.com\//.test(u))d.submitUrl=u;
@@ -1977,8 +2015,9 @@ async function importFromSheet(silent){
   try{
     const d=sheetRowsToState(await fetchSheetRowsG());
     if(!d)throw 0;
-    ['year','sem','terms','user','targetWeeks','uid','feedback','submitUrl','lockYear'].forEach(k=>{if(d[k]!==undefined)state[k]=d[k];});
+    ['year','sem','terms','user','targetWeeks','uid','feedback','priority','submitUrl','lockYear'].forEach(k=>{if(d[k]!==undefined)state[k]=d[k];});
     if(d.feedback===undefined)state.feedback=null;
+    if(d.priority===undefined)state.priority=null;
     render();
     toast('구글시트의 학사일정을 불러왔습니다');
     return true;
@@ -2030,7 +2069,8 @@ async function pushToSheet(){
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({action:'replace',pw:sheetPwPlain,
         data:{year:state.year,sem:state.sem,terms:state.terms,user:state.user,
-              targetWeeks:state.targetWeeks,feedback:state.feedback,lockYear:state.lockYear}})});
+              targetWeeks:state.targetWeeks,feedback:state.feedback,priority:state.priority,
+              lockYear:state.lockYear}})});
     const res=await r.json();
     if(res&&res.ok)toast(`구글시트에 반영되었습니다 (${res.rows}행) — 뷰어는 새로고침 시 반영됩니다`);
     else if(res&&res.error==='bad_pw'){sheetPwPlain=null;alert('접수 스크립트의 관리자 비밀번호(ADMIN_PW)와 일치하지 않습니다.\nApps Script의 ADMIN_PW 설정을 확인해 주세요.');}
