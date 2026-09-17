@@ -339,7 +339,6 @@
     <button data-view="list"><svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>전체 일정</button>
   </div>
   <button class="btnprint" onclick="window.print()"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg>인쇄</button>
-  <button class="btnprint" id="btnReviewTop" hidden title="부서에서 제출한 의견을 검토·반영합니다 (비밀번호 필요)">💬 의견 검토</button>
   <button class="btnprint" id="btnAdmin" title="비밀번호 필요"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>관리자</button>
 </div>
 
@@ -372,7 +371,6 @@
 <footer>
   <span>이 페이지는 <b>학사일정 · 수업일수표 생성기</b>에서 입력한 데이터를 그대로 보여주는 열람 전용 페이지입니다.</span>
   <a href="generator.html" id="lnkAdmin">⚙ 생성기(관리자) 열기</a>
-  <a href="#" id="lnkReview" hidden>💬 의견 검토(관리자)</a>
 </footer>
 
 <script>
@@ -1199,10 +1197,6 @@ function closeSearch(){$('#sres').hidden=true;}
 const escFb=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let fbItems=[];
 function setupFeedback(){
-  const lnk=$('#lnkReview');
-  if(lnk){lnk.hidden=!D.submitUrl;lnk.onclick=e=>{e.preventDefault();openReview();};}
-  const topBtn=$('#btnReviewTop');
-  if(topBtn){topBtn.hidden=!D.submitUrl;topBtn.onclick=()=>openReview();}
   const bar=$('#fbbar');
   const fb=D.feedback;
   if(!fb||!fb.start||!fb.end||todayISO<fb.start||todayISO>fb.end){bar.hidden=true;return;}
@@ -1346,82 +1340,6 @@ async function postJSON(url,obj){
   const r=await fetch(url,{method:'POST',redirect:'follow',
     headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(obj)});
   return await r.json();
-}
-
-/* ============================================================
-   3.6 의견 검토 (관리자) : 시트의 '의견' 탭에서 대기 건을 읽어
-      [반영]/[반려] — 반영 시 접수 스크립트가 시트의 일정을 직접 수정
-   ============================================================ */
-let adminPwPlain=null;
-async function openReview(){
-  if(!D.submitUrl){alert('접수 스크립트(제출주소)가 설정되지 않았습니다');return;}
-  if(!adminPwPlain){
-    const pw=prompt('관리자 비밀번호를 입력하세요');
-    if(pw===null)return;
-    const hash=D.adminPwHash||DEFAULT_PW_HASH;
-    let ok=false;try{ok=(await sha256hex(pw))===hash;}catch(e){}
-    if(!ok){alert('비밀번호가 올바르지 않습니다');return;}
-    adminPwPlain=pw;
-  }
-  const m=$('#fbmodal');
-  m.hidden=false;
-  m.innerHTML=`<div class="fbbox">
-    <h2>부서 의견 검토 <span class="fbclose" title="닫기">×</span></h2>
-    <p class="sub">[반영]을 누르면 구글시트의 일정이 바로 수정되고, 사이트 새로고침 시 모두에게 반영됩니다.</p>
-    <div id="rvList" class="fbitems" style="border-top:0;padding-top:0">불러오는 중…</div>
-    <div class="fbbtns"><button id="rvClose">닫기</button><button class="pri" id="rvReload">새로고침</button></div>
-  </div>`;
-  const close=()=>{m.hidden=true;};
-  m.querySelector('.fbclose').onclick=close;
-  $('#rvClose').onclick=close;
-  m.onclick=e=>{if(e.target===m)close();};
-  $('#rvReload').onclick=loadReview;
-  await loadReview();
-}
-async function loadReview(){
-  const box=$('#rvList');if(!box)return;
-  box.textContent='불러오는 중…';
-  let rows;
-  try{
-    rows=await fetchSheetRows('의견');
-  }catch(e){box.textContent='의견 목록을 읽지 못했습니다 — 아직 제출된 의견이 없거나 시트 공유 설정을 확인해 주세요';return;}
-  // 열: 0제출일시 1부서명 2학기 3구분 4대상일정 5대상시작일 6제안명칭 7제안시작일 8제안종료일 9분류 10의견 11상태
-  const pend=[];
-  rows.forEach((r,i)=>{
-    if(i===0)return;                       // 머리글
-    if(String(r[11]||'').trim()!=='대기')return;
-    pend.push({row:i+1,ts:r[0],dept:r[1],term:r[2],type:String(r[3]||'').trim(),
-      targetName:r[4],name:r[6],iso:r[7],end:r[8],note:r[10]});
-  });
-  if(!pend.length){box.textContent='대기 중인 의견이 없습니다';return;}
-  box.innerHTML=pend.map(o=>{
-    const range=o.iso?(o.iso+(o.end&&o.end!==o.iso?'~'+o.end:'')):'';
-    let desc='';
-    if(o.type==='추가')desc=`${escFb(o.name)} · ${range}`;
-    else if(o.type==='수정')desc=`'${escFb(o.targetName)}' → ${o.name?escFb(o.name):'(명칭 유지)'}${range?' · '+range:''}`;
-    else if(o.type==='삭제')desc=`'${escFb(o.targetName)}' 삭제`;
-    else desc=escFb(o.note);
-    const noteLine=(o.type!=='기타'&&o.note)?`<div style="font-size:12px;color:var(--muted)">"${escFb(o.note)}"</div>`:'';
-    return `<div class="fi" style="align-items:flex-start">
-      <span class="t"><b>[${escFb(o.dept)}·${escFb(o.type)}]</b> ${desc}
-        <div style="font-size:11.5px;color:var(--faint)">${escFb(o.term)} 학기 · ${escFb(o.ts)} 제출</div>${noteLine}</span>
-      ${o.type!=='기타'?`<button class="rvbtn" data-act="apply" data-row="${o.row}" data-ts="${escFb(o.ts)}" data-dept="${escFb(o.dept)}">반영</button>`:''}
-      <button class="rvbtn" data-act="close" data-row="${o.row}" data-ts="${escFb(o.ts)}" data-dept="${escFb(o.dept)}">${o.type==='기타'?'확인':'반려'}</button>
-    </div>`;
-  }).join('');
-  box.querySelectorAll('.rvbtn').forEach(b=>b.onclick=async()=>{
-    b.disabled=true;b.textContent='처리 중…';
-    const act=b.dataset.act;
-    try{
-      const res=await postJSON(D.submitUrl,{action:act,pw:adminPwPlain,row:+b.dataset.row,
-        ts:b.dataset.ts,dept:b.dataset.dept,status:'반려'});
-      if(res&&res.ok){
-        if(act==='apply')alert('반영되었습니다 — 새로고침하면 달력에 표시됩니다.');
-        await loadReview();
-      }else if(res&&res.error==='bad_pw'){adminPwPlain=null;alert('스크립트의 관리자 비밀번호(ADMIN_PW)와 일치하지 않습니다. Apps Script의 ADMIN_PW 설정을 확인해 주세요.');}
-      else{alert('처리하지 못했습니다: '+(res&&res.error||'알 수 없는 오류'));await loadReview();}
-    }catch(e){alert('처리하지 못했습니다 — 잠시 후 다시 시도해 주세요\n\n[진단] '+(e&&e.message?e.message:e));await loadReview();}
-  });
 }
 
 /* ============================================================
