@@ -1326,7 +1326,8 @@ function openFbModal(){
     if((type==='edit'||type==='del')&&!tObj){alert('대상 일정을 선택해 주세요');return;}
     if(type==='edit'&&!name&&!iso&&!end&&!note){alert('변경할 내용(명칭·날짜)이나 의견을 입력해 주세요');return;}
     if(type==='etc'&&!note){alert('의견 내용을 입력해 주세요');return;}
-    fbItems.push({term,type,targetId:tObj?tObj.id:null,targetName:tObj?tObj.name:'',targetIso:tObj?tObj.iso:'',
+    const useT=(type==='edit'||type==='del')?tObj:null;   // 추가·기타 의견에는 대상 일정 기록 안 함
+    fbItems.push({term,type,targetId:useT?useT.id:null,targetName:useT?useT.name:'',targetIso:useT?useT.iso:'',
                   name,iso,end:end||iso,kind:type==='add'?$('#fbKind').value:'',note});
     $('#fbName').value='';$('#fbStart').value='';$('#fbEnd').value='';$('#fbNote').value='';
     renderItems();

@@ -60,9 +60,9 @@ function submitOpinions(req) {
     var items = req.items || [];
     for (var i = 0; i < items.length; i++) {
       var it = items[i];
-      s.appendRow([now, String(req.dept || ''), it.term || '', it.type || '',
-                   it.targetName || '', it.targetIso || '', it.name || '',
-                   it.iso || '', it.end || '', it.kind || '', it.note || '', '대기']);
+      appendTextRow(s, [now, String(req.dept || ''), it.term || '', it.type || '',
+                        it.targetName || '', it.targetIso || '', it.name || '',
+                        it.iso || '', it.end || '', it.kind || '', it.note || '', '대기']);
     }
     return { ok: true, count: items.length };
   } finally { lock.releaseLock(); }
@@ -74,6 +74,23 @@ function normD(v) {
   var m = s.match(/^(\d{4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})\.?$/);
   if (m) return m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2);
   return s;
+}
+
+/* 학기키 복원 : 시트가 '2027-1'을 날짜(2027년 1월)로 자동 변환해 저장하는 경우가 있어
+   Date나 '2027. 1.' 같은 형태를 다시 '2027-1' 텍스트로 되돌린다 */
+function normTerm(v) {
+  if (v instanceof Date) return v.getFullYear() + '-' + (v.getMonth() + 1);
+  var s = String(v || '').trim();
+  var m = s.match(/^(\d{4})\D+([12])\D*$/);
+  return m ? m[1] + '-' + m[2] : s;
+}
+
+/* 행을 텍스트 서식으로 고정해 추가 — 날짜·학기키가 자동 변환되지 않게 */
+function appendTextRow(sheet, vals) {
+  var row = sheet.getLastRow() + 1;
+  var rg = sheet.getRange(row, 1, 1, vals.length);
+  rg.setNumberFormat('@');
+  rg.setValues([vals]);
 }
 
 /* 의견 행 확인 : 행 번호 + 제출일시·부서명 대조 (목록이 밀렸을 때 오반영 방지) */
@@ -97,7 +114,7 @@ function applyOpinion(req) {
     var op = checkOpRow(req);
     if (!op) return { ok: false, error: 'row_mismatch' };
     var v = op.v;
-    var term = String(v[2]).trim(), type = String(v[3]).trim();
+    var term = normTerm(v[2]), type = String(v[3]).trim();
     var targetName = String(v[4]).trim(), targetIso = normD(v[5]);
     var name = String(v[6]).trim(), iso = normD(v[7]), end = normD(v[8]);
     var kind = String(v[9]).trim() || '학사';
@@ -105,13 +122,13 @@ function applyOpinion(req) {
 
     if (type === '추가') {
       if (!name || !iso) return { ok: false, error: 'missing_fields' };
-      d.appendRow(['일정', term, iso, end || iso, name, kind]);
+      appendTextRow(d, ['일정', term, iso, end || iso, name, kind]);
     } else if (type === '수정' || type === '삭제') {
       var data = d.getDataRange().getValues();
       var idx = -1;
       for (var i = 0; i < data.length; i++) {
         var r = data[i];
-        if (String(r[0]).trim() === '일정' && String(r[1]).trim() === term &&
+        if (String(r[0]).trim() === '일정' && normTerm(r[1]) === term &&
             String(r[4]).trim() === targetName &&
             (!targetIso || normD(r[2]) === targetIso)) { idx = i + 1; break; }
       }
@@ -119,8 +136,8 @@ function applyOpinion(req) {
       if (type === '삭제') d.deleteRow(idx);
       else {
         if (name) d.getRange(idx, 5).setValue(name);
-        if (iso) { d.getRange(idx, 3).setValue(iso); d.getRange(idx, 4).setValue(end || iso); }
-        else if (end) d.getRange(idx, 4).setValue(end);
+        if (iso) { var rg = d.getRange(idx, 3, 1, 2); rg.setNumberFormat('@'); rg.setValues([[iso, end || iso]]); }
+        else if (end) { var rg2 = d.getRange(idx, 4); rg2.setNumberFormat('@'); rg2.setValue(end); }
       }
     } else {
       return { ok: false, error: 'not_applicable' };  // 기타 의견은 [확인]으로 처리
