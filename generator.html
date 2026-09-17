@@ -1937,7 +1937,15 @@ async function sheetOpAction(o,act,btn){
       alert('접수 스크립트의 관리자 비밀번호(ADMIN_PW)와 일치하지 않습니다.\nApps Script의 ADMIN_PW 설정을 확인해 주세요.');
     }else{
       renderOpinions();
-      alert('처리하지 못했습니다: '+(res&&res.error||'알 수 없는 오류'));
+      const MSG={
+        target_not_found:'대상 일정을 시트 첫 탭에서 찾지 못했습니다.\n- 이미 삭제·변경된 일정이거나,\n- 접수 스크립트가 구버전일 수 있습니다 → Apps Script [배포]→[배포 관리]에서 시트 제출주소와 같은 URL의 배포를 "새 버전"으로 다시 배포해 주세요.',
+        row_mismatch:'의견 목록이 변경되어 행이 어긋났습니다 — [의견 검토]로 목록을 새로 불러온 뒤 다시 시도해 주세요.',
+        missing_fields:'의견에 명칭·날짜가 없어 자동 반영할 수 없습니다 — 내용을 보고 직접 처리해 주세요.',
+        not_applicable:'기타 의견은 [확인]으로 처리해 주세요.',
+        bad_data:'보낼 데이터가 비어 있습니다 — 화면에 학년도·학기가 입력되어 있는지 확인해 주세요.',
+      };
+      const code=res&&res.error||'알 수 없는 오류';
+      alert('처리하지 못했습니다 ['+code+']\n\n'+(MSG[code]||''));
     }
   }catch(e){
     renderOpinions();
