@@ -587,6 +587,11 @@ async function loadSheet(fresh){
   const errs=[];
   const paths=[];
   const jsonp=['실시간',()=>loadSheetJsonp('')];
+  if(fresh&&D&&D.submitUrl)paths.push(['스크립트',async()=>{   // 캐시 지연 없는 원본 읽기 (구버전 스크립트면 다음 경로로)
+    const res=await postJSON(D.submitUrl,{action:'read'});
+    if(!res||!res.ok||!Array.isArray(res.rows))throw new Error(res&&res.error||'read 실패');
+    return res.rows;
+  }]);
   if(fresh)paths.push(jsonp);
   if(PUB_CSV_URL)paths.push(['게시CSV',()=>fetchCsvRows(`${PUB_CSV_URL}&nc=${Date.now()}`)]);
   paths.push(['CSV',()=>fetchCsvRows(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&nc=${Date.now()}`)]);
@@ -1397,7 +1402,11 @@ function openFbModal(){
 async function postJSON(url,obj){
   const r=await fetch(url,{method:'POST',redirect:'follow',
     headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(obj)});
-  return await r.json();
+  const txt=await r.text();
+  try{return JSON.parse(txt);}catch(e){}
+  /* JSON 대신 구글 오류 페이지(HTML)가 온 경우 — 담당자가 원인을 알 수 있게 본문 일부를 담아 알림 */
+  const plain=txt.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+  throw new Error('접수 스크립트가 오류 페이지를 돌려주었습니다 (HTTP '+r.status+')'+(plain?' — '+plain.slice(0,150):''));
 }
 
 /* ============================================================
