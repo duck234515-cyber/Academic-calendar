@@ -775,6 +775,7 @@ window.AC_PW_HASH_P=(async function(){
         <span class="count" id="opCount">0</span>
       </div>
       <div class="bd">
+        <p class="hint" id="scriptStatus" style="margin-top:0;margin-bottom:6px"></p>
         <p class="hint" id="fbPeriodLine" style="margin-top:0;margin-bottom:10px"></p>
         <div style="display:flex;gap:8px;margin-bottom:10px">
           <button class="btn" id="btnFbPeriod" style="flex:1;justify-content:center">기간 설정</button>
@@ -1926,10 +1927,8 @@ async function sheetOpAction(o,act,btn){
   }
   if(btn){btn.disabled=true;btn.textContent='처리 중…';}
   try{
-    const r=await fetch(url,{method:'POST',redirect:'follow',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:act,pw:sheetPwPlain,row:o.row,ts:o.ts,dept:o.dept,status:'반려'})});
-    const res=await r.json();
+    clearTimeout(autoPushTimer);await autoPush();   // 화면의 미반영 변경을 먼저 시트에 쓰고 나서 처리
+    const res=await callScript({action:act,pw:sheetPwPlain,row:o.row,ts:o.ts,dept:o.dept,status:'반려'});
     if(res&&res.ok){
       if(act==='apply'){
         await importFromSheet(true,true);   // 시트가 방금 수정됨 — 실시간 경로로 최신 일정을 받아 화면 갱신
@@ -1953,7 +1952,8 @@ async function sheetOpAction(o,act,btn){
     }
   }catch(e){
     renderOpinions();
-    alert('처리하지 못했습니다 — 잠시 후 다시 시도해 주세요\n\n[진단] '+(e&&e.message?e.message:e));
+    alert('처리하지 못했습니다\n\n'+(e&&e.message?e.message:e));
+    checkScript();
   }
 }
 $('#btnOpSheet').onclick=()=>loadSheetOpinions(false);
@@ -2162,20 +2162,6 @@ async function fetchSheetRowsG(sheetName,fresh){
     return await loadSheetJsonpG(sheetName);   // fetch가 CORS 등으로 막히면 JSONP로 재시도
   }
 }
-/* 시트가 원본인 설정(의견수렴·우선표시·연도잠금·제출주소)은 열 때마다 시트 값으로 동기화
-   — 화면 표시와 뷰어 동작이 어긋나거나, [시트에 반영]이 시트의 설정 행을 지우는 일을 막는다 */
-async function syncSettingsFromSheet(){
-  try{
-    const{d}=await loadStateFromSheet();
-    if(!d)return;
-    state.feedback=d.feedback||null;
-    state.priority=d.priority||null;
-    if(d.lockYear!==undefined)state.lockYear=d.lockYear;
-    if(d.submitUrl)state.submitUrl=d.submitUrl;
-    saveState();render();
-    markSheetSynced();   // 설정 동기화 시점의 화면을 기준으로 이후 변경분부터 자동 반영
-  }catch(e){}
-}
 /* 경로별로 시도하되 형식 인식까지 성공해야 채택 (뷰어 loadSheet와 같은 방식)
    — 한 경로가 빈/엉뚱한 응답을 줘도 다음 경로로 넘어가고, 전부 실패하면 원인 목록을 돌려준다 */
 async function loadStateFromSheet(fresh){
@@ -2188,6 +2174,11 @@ async function loadStateFromSheet(fresh){
     return parseCSVg(await r.text());
   };
   const paths=[];
+  if(fresh&&state.submitUrl)paths.push(['스크립트',async()=>{   // 캐시 지연 없는 원본 읽기 (구버전 스크립트면 다음 경로로)
+    const res=await callScript({action:'read'});
+    if(!res||!res.ok||!Array.isArray(res.rows))throw new Error(res&&res.error==='bad_action'?'구버전':(res&&res.error||'read 실패'));
+    return res.rows;
+  }]);
   if(fresh)paths.push(jsonp);
   if(PUB_CSV_URL)paths.push(['게시CSV',csvGet(`${PUB_CSV_URL}&nc=${Date.now()}`)]);
   paths.push(['CSV',csvGet(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&nc=${Date.now()}`)]);
@@ -2228,6 +2219,7 @@ $('#btnSyncG').onclick=async()=>{
   try{
     const ok=await importFromSheet(false,true);
     if(ok)await loadSheetOpinions(true);
+    checkScript();
   }finally{b.disabled=false;}
 };
 
@@ -2237,6 +2229,49 @@ $('#btnSyncG').onclick=async()=>{
    시트의 메모·제출주소·비밀번호해시 행은 스크립트가 보존한다.
    ============================================================ */
 let sheetPwPlain=null;
+const NEED_SCRIPT_VER=4;
+/* 접수 스크립트 호출 — JSON 대신 구글 오류 페이지(HTML)가 오면 원인을 풀어서 throw */
+async function callScript(obj){
+  const url=await findSubmitUrl();
+  if(!url)throw new Error('접수 스크립트 주소(시트의 제출주소 행)를 찾지 못했습니다');
+  let r;
+  try{
+    r=await fetch(url,{method:'POST',redirect:'follow',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(obj)});
+  }catch(e){throw new Error('스크립트 주소에 연결하지 못했습니다 (네트워크·주소 오류: '+(e&&e.message||e)+')');}
+  const txt=await r.text();
+  try{return JSON.parse(txt);}catch(e){}
+  throw new Error(explainScriptPage(txt,r.status));
+}
+function explainScriptPage(txt,status){
+  const plain=String(txt||'').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,' ')
+    .replace(/<[^>]+>/g,' ').replace(/&nbsp;|&#160;/g,' ').replace(/&amp;/g,'&').replace(/\s+/g,' ').trim();
+  const has=(...ks)=>ks.some(k=>txt.includes(k)||plain.toLowerCase().includes(k.toLowerCase()));
+  let why;
+  if(has('accounts.google.com','ServiceLogin'))
+    why='스크립트 배포의 액세스 권한이 "모든 사용자"가 아닙니다 → [배포 관리] → 연필 → 액세스 권한 "모든 사용자"로 저장';
+  else if(has('Authorization is required','승인이 필요','authorization'))
+    why='스크립트 권한 승인이 필요합니다 → Apps Script 편집기 위쪽에서 readData 함수를 골라 [실행] → 권한 승인 후 다시 시도';
+  else if(has('Script function not found','함수를 찾을 수 없'))
+    why='스크립트에 doPost 함수가 없습니다 → apps-script.gs 코드 전체를 다시 붙여넣고 새 버전으로 배포';
+  else if(status===404||has('unable to open the file','파일을 열 수 없','Page Not Found','찾을 수 없습니다'))
+    why='제출주소의 배포가 없거나 보관(삭제)되었습니다 → [배포 관리]의 활성 배포 URL을 시트 제출주소 행에 넣어 주세요';
+  else if(has('SyntaxError','ReferenceError','TypeError'))
+    why='스크립트 코드 오류입니다 → apps-script.gs 코드 전체를 다시 붙여넣고 새 버전으로 배포';
+  else why='스크립트가 JSON 대신 오류 페이지를 돌려주었습니다 (HTTP '+status+')';
+  return why+(plain?'\n\n[응답 내용] '+plain.slice(0,180):'');
+}
+/* 접수 스크립트 상태 점검 — 부서 의견 수렴 카드 위쪽 줄에 표시 */
+async function checkScript(){
+  const el=$('#scriptStatus');if(!el)return;
+  if(!await findSubmitUrl()){el.innerHTML='접수 스크립트 : <b>미설정</b> (시트에 제출주소 행 필요)';return;}
+  el.textContent='접수 스크립트 : 확인 중…';
+  try{
+    const res=await callScript({action:'ping'});
+    if(res&&res.ok&&+res.version>=NEED_SCRIPT_VER)el.innerHTML=`접수 스크립트 : <b style="color:#1b7a1b">정상 연결</b> (v${res.version})`;
+    else el.innerHTML='접수 스크립트 : <b style="color:#b30000">구버전</b> — apps-script.gs 최신 코드로 교체 후 [배포 관리]에서 새 버전으로 배포하세요';
+  }catch(e){el.innerHTML='접수 스크립트 : <b style="color:#b30000">연결 오류</b> — '+escOp(e.message).replace(/\n/g,'<br>');}
+}
 async function findSubmitUrl(){
   if(state.submitUrl)return state.submitUrl;
   try{
@@ -2265,19 +2300,15 @@ async function pushToSheet(){
       sheetPwPlain=pw;
     }
     btn.textContent='반영 중…';
-    const r=await fetch(url,{method:'POST',redirect:'follow',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'replace',pw:sheetPwPlain,
-        data:{year:state.year,sem:state.sem,terms:state.terms,user:state.user,
-              targetWeeks:state.targetWeeks,feedback:state.feedback,priority:state.priority,
-              lockYear:state.lockYear}})});
-    const res=await r.json();
-    if(res&&res.ok){markSheetSynced();toast(`구글시트에 반영되었습니다 (${res.rows}행) — 뷰어는 새로고침 시 반영됩니다`);}
+    const snapshot=pushCore();
+    const res=await callScript({action:'replace',pw:sheetPwPlain,data:replacePayload()});
+    if(res&&res.ok){lastPushed=snapshot;updateSyncBadge();toast(`구글시트에 반영되었습니다 (${res.rows}행) — 뷰어는 새로고침 시 반영됩니다`);}
     else if(res&&res.error==='bad_pw'){sheetPwPlain=null;alert('접수 스크립트의 관리자 비밀번호(ADMIN_PW)와 일치하지 않습니다.\nApps Script의 ADMIN_PW 설정을 확인해 주세요.');}
     else if(res&&res.error==='bad_action')alert('접수 스크립트가 구버전입니다.\napps-script.gs 최신 내용으로 교체한 뒤 [배포 관리]에서 새 버전으로 배포해 주세요.');
     else throw new Error(res&&res.error||'unknown');
   }catch(e){
-    alert('시트에 반영하지 못했습니다 — 잠시 후 다시 시도해 주세요.\n(계속 실패하면 접수 스크립트의 배포 상태를 확인해 주세요)');
+    alert('시트에 반영하지 못했습니다\n\n'+(e&&e.message?e.message:e));
+    checkScript();
   }finally{
     btn.disabled=false;
     btn.innerHTML='<svg class="icon" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4l4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>시트에 반영';
@@ -2301,13 +2332,18 @@ window.addEventListener('resize',setStickyTop);
    ============================================================ */
 const pushCore=()=>JSON.stringify({terms:state.terms,user:state.user,targetWeeks:state.targetWeeks,
   feedback:state.feedback,priority:state.priority,lockYear:state.lockYear});
+const replacePayload=()=>({year:state.year,sem:state.sem,terms:state.terms,user:state.user,
+  targetWeeks:state.targetWeeks,feedback:state.feedback,priority:state.priority,lockYear:state.lockYear});
+const PENDING_KEY='ac_gen_pending_push';   // 시트에 아직 반영되지 않은 변경이 이 브라우저에 있음
 let lastPushed=null;          // 마지막으로 시트와 일치했던 핵심 상태 (null = 기준 없음 → 자동 반영 안 함)
 let autoPushOff=false;        // 비밀번호 취소 시 이 세션에서는 자동 반영 중단
 let autoPushTimer=null,autoPushing=false;
 function markSheetSynced(){lastPushed=pushCore();updateSyncBadge();}
 function updateSyncBadge(){
-  const b=$('#btnSheetPush');if(!b)return;
-  b.classList.toggle('needsync',lastPushed!==null&&pushCore()!==lastPushed);
+  if(lastPushed===null)return;              // 기준이 잡히기 전(시트 확인 전)에는 표시·기록하지 않음
+  const dirty=pushCore()!==lastPushed;
+  const b=$('#btnSheetPush');if(b)b.classList.toggle('needsync',dirty);
+  try{dirty?localStorage.setItem(PENDING_KEY,'1'):localStorage.removeItem(PENDING_KEY);}catch(e){}
 }
 function scheduleAutoPush(){
   updateSyncBadge();
@@ -2318,8 +2354,7 @@ function scheduleAutoPush(){
 async function autoPush(){
   if(autoPushing){scheduleAutoPush();return;}
   if(autoPushOff||lastPushed===null||pushCore()===lastPushed)return;
-  const url=await findSubmitUrl();
-  if(!url)return;                       // 접수 스크립트 미설정 — 수동 [시트에 반영]만 가능
+  if(!await findSubmitUrl())return;      // 접수 스크립트 미설정 — 수동 [시트에 반영]만 가능
   if(!sheetPwPlain){
     const pw=prompt('변경 사항을 구글시트에 자동 반영합니다 — 관리자 비밀번호를 입력하세요.\n(취소하면 이 창에서는 자동 반영이 꺼지고, [시트에 반영] 버튼으로 직접 반영해야 합니다)');
     if(pw===null){
@@ -2331,34 +2366,40 @@ async function autoPush(){
   }
   autoPushing=true;
   const snapshot=pushCore();
+  let failed=false;
   try{
-    const r=await fetch(url,{method:'POST',redirect:'follow',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({action:'replace',pw:sheetPwPlain,
-        data:{year:state.year,sem:state.sem,terms:state.terms,user:state.user,
-              targetWeeks:state.targetWeeks,feedback:state.feedback,priority:state.priority,
-              lockYear:state.lockYear}})});
-    const res=await r.json();
+    const res=await callScript({action:'replace',pw:sheetPwPlain,data:replacePayload()});
     if(res&&res.ok){lastPushed=snapshot;updateSyncBadge();toast('변경 사항을 구글시트에 반영했습니다');}
-    else if(res&&res.error==='bad_pw'){sheetPwPlain=null;toast('비밀번호가 달라 자동 반영하지 못했습니다 — 다음 변경 때 다시 확인합니다');}
-    else toast('자동 반영 실패 — [시트에 반영]으로 직접 반영해 주세요');
-  }catch(e){toast('자동 반영 실패(네트워크) — [시트에 반영]으로 직접 반영해 주세요');}
-  finally{autoPushing=false;scheduleAutoPush();}   // 반영 중 추가 변경이 있었으면 이어서 반영
+    else if(res&&res.error==='bad_pw'){sheetPwPlain=null;failed=true;toast('비밀번호가 스크립트의 ADMIN_PW와 달라 반영하지 못했습니다 — 다음 변경 때 다시 묻습니다');}
+    else{failed=true;toast('자동 반영 실패 ['+(res&&res.error||'알 수 없음')+'] — [시트에 반영]으로 직접 반영해 주세요');}
+  }catch(e){
+    failed=true;
+    toast('자동 반영 실패 — 부서 의견 수렴 카드의 접수 스크립트 상태를 확인해 주세요');
+    checkScript();
+  }
+  finally{autoPushing=false;if(!failed)scheduleAutoPush();}   // 반영 중 추가 변경이 있었으면 이어서 반영 (실패 시엔 반복하지 않음)
 }
 
 /* 초기 렌더 */
 const HAS_SAVED=!!localStorage.getItem(LS_KEY);
+const WAS_PENDING=(()=>{try{return localStorage.getItem(PENDING_KEY)==='1';}catch(e){return false;}})();
 loadState();
 render();
 setStickyTop();
 wireDatePickers();
-/* 이 브라우저에 저장된 입력값이 없으면(새 PC·새 브라우저) 시트에서 자동으로 불러오기.
-   저장된 입력값이 있어도 시트가 원본인 설정(의견수렴·우선표시·연도잠금)은 시트 값으로 맞추고,
-   대기 중인 부서 의견 건수를 배지에 표시한다 */
+/* 시트가 원본 — 열 때마다 시트 전체를 불러와 화면과 자동 반영의 기준으로 삼는다.
+   (예전 입력값을 기준으로 삼으면 첫 수정 때 오래된 일정이 시트를 덮어쓸 수 있음)
+   단, 이 브라우저에 시트에 반영되지 못한 변경이 남아 있으면 어느 쪽을 살릴지 묻는다 */
 (async()=>{
-  if(HAS_SAVED)await syncSettingsFromSheet();
-  else await importFromSheet(true);
-  if(SHEET_ID)loadSheetOpinions(true);
+  if(!SHEET_ID)return;
+  if(HAS_SAVED&&WAS_PENDING&&confirm('이 브라우저에 아직 구글시트에 반영되지 않은 변경이 있습니다.\n\n[확인] 이 변경을 구글시트에 반영\n[취소] 구글시트 내용으로 불러오기 (이 변경은 버림)')){
+    lastPushed='';                        // 시트와 다르다고 보고 곧바로 자동 반영
+    scheduleAutoPush();
+  }else if(!await importFromSheet(true,true)){
+    toast('구글시트를 읽지 못해 자동 반영이 꺼져 있습니다 — [동기화]로 다시 시도하세요');
+  }
+  loadSheetOpinions(true);
+  checkScript();
 })();
 </script>
 </body>

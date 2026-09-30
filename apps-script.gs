@@ -20,12 +20,15 @@
 
 var ADMIN_PW = 'CHANGE-ME';   // ★ 사이트 관리자 비밀번호와 동일하게 변경하세요
 var OP_SHEET = '의견';        // 의견이 쌓이는 탭 이름 (자동 생성)
+var SCRIPT_VERSION = 4;       // 생성기가 구버전 배포를 알아보는 데 쓰는 번호 (수정하지 마세요)
 
 function doPost(e) {
   var out = { ok: false, error: 'bad_request' };
   try {
     var req = JSON.parse(e.postData.contents);
     if (req.action === 'submit') out = submitOpinions(req);
+    else if (req.action === 'ping') out = { ok: true, version: SCRIPT_VERSION };
+    else if (req.action === 'read') out = readData();
     else if (req.action === 'apply' || req.action === 'close' || req.action === 'replace') {
       if (String(req.pw || '') !== ADMIN_PW) out = { ok: false, error: 'bad_pw' };
       else out = req.action === 'apply' ? applyOpinion(req)
@@ -49,6 +52,21 @@ function opSheet() {
                  '제안명칭','제안시작일','제안종료일','분류','의견','상태']);
   }
   return s;
+}
+
+/* 일정 데이터 탭을 그대로 읽어 돌려줌 — 공개 CSV·gviz와 달리 캐시 지연이 없어,
+   쓰기 직후 화면을 갱신할 때 사용. 날짜로 변환된 셀은 텍스트로 되돌려 보낸다 */
+function readData() {
+  var rows = dataSheet().getDataRange().getValues().map(function (r) {
+    var kind = String(r[0] || '').trim();
+    var termRow = (kind === '학기' || kind === '일정');
+    return r.map(function (c, j) {
+      if (j === 1 && termRow) return normTerm(c);
+      if (c instanceof Date) return normD(c);
+      return (c === null || c === undefined) ? '' : String(c);
+    });
+  });
+  return { ok: true, version: SCRIPT_VERSION, rows: rows };
 }
 
 /* 부서 의견 제출 : 의견 탭에 행 추가 */
