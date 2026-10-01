@@ -138,7 +138,7 @@
   .tag.off{background:#eef1f6;color:#4a586e}
   .tag.event{background:#edf1f6;color:#42597a}
   .tag.exam{background:var(--exam-bg);color:var(--exam-text)}
-  .tag.makeup{background:#f0e4f8;color:#68217A}
+  .tag.makeup{background:#7a2f96;color:#fff}
   .tag.admin{background:#e8ecf0;color:#44546a}
   .item .x{cursor:pointer;color:var(--faint);display:flex;padding:3px;border-radius:6px}
   .item .x:hover{color:var(--sun);background:#fbeceb}
@@ -198,7 +198,7 @@
   table.weeks td.bigo .chip{display:inline-block;margin:1px 3px 1px 0;font-size:11px;padding:1px 7px;border-radius:6px;
         background:var(--accent-soft);color:#42526b;font-weight:600}
   table.weeks td.bigo .chip.exam{background:var(--exam-bg);color:var(--exam-text)}
-  table.weeks td.bigo .chip.mk{background:#f0e4f8;color:#68217A}
+  table.weeks td.bigo .chip.mk{background:#7a2f96;color:#fff}
   table.weeks td.bigo .chip.q{background:var(--mark-bg);color:var(--mark-text)}
   table.weeks tbody tr:hover td{background:#fafbfd}
   table.weeks tbody tr:hover td.off{background:#eef0f3}
@@ -285,9 +285,10 @@
   table.weeks td.exam{background:#a9dcf1}
   table.weeks td.exam .ename{display:block;font-size:8.5px;font-weight:800;line-height:1.05;margin-top:1px;
     color:#085a75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  table.weeks td.makeup{background:#e3d3f2}
+  table.weeks td.makeup{background:#7a2f96}
+  table.weeks td.makeup .d{color:#fff!important;font-weight:900}
   table.weeks td.makeup .ename{display:block;font-size:8.5px;font-weight:800;line-height:1.05;margin-top:1px;
-    color:#68217A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   table.weeks td.wk{background:var(--accent-soft);color:var(--accent-dark);font-weight:800}
   /* 공휴일/휴업일 : 그냥 빨간색 */
   table.weeks td.off{background:var(--off-bg)!important;color:var(--off-text)!important}
@@ -320,8 +321,8 @@
   table.cal td.exam{background:var(--exam-bg)}
   table.cal td.exam .n,table.cal td.exam .lbl{color:var(--exam-text);font-weight:700}
   table.cal td.ev .n,table.cal td.ev .lbl{color:var(--event-text);font-weight:700}
-  table.cal td.mk{background:#efe3f8}
-  table.cal td.mk .n,table.cal td.mk .lbl{color:#68217A;font-weight:700}
+  table.cal td.mk{background:#7a2f96}
+  table.cal td.mk .n,table.cal td.mk .lbl,table.cal td.mk .lbl.adm-lbl{color:#fff;font-weight:700}
   table.cal td.adm .n,table.cal td.adm .lbl{color:#757575;font-weight:700}
   table.cal td .lbl.adm-lbl{color:#757575;font-weight:700}
   /* 휴일 요약표 (이미지2 형식) */
@@ -483,8 +484,9 @@
     table.weeks td.exam{background:#b0e0f4!important}
     table.weeks td.exam .ename{color:#085a75!important;font-size:8pt;font-weight:800;margin:1px 0 0}
     /* 보강 : 연보라 바탕 + 보강명 표기 */
-    table.weeks td.makeup{background:#e4d4f4!important}
-    table.weeks td.makeup .ename{color:#5e1f6e!important;font-size:8pt;font-weight:800;margin:1px 0 0}
+    table.weeks td.makeup{background:#7a2f96!important}
+    table.weeks td.makeup .d{color:#fff!important}
+    table.weeks td.makeup .ename{color:#fff!important;font-size:8pt;font-weight:800;margin:1px 0 0}
     /* 수업일수 1/4~3/4 · 종강 : 연초록 바탕 + 진한 단색 배지 */
     table.weeks td.mark{background:#e0f3da!important}
     table.weeks td.mark .badge{background:#1b7a1b!important;color:#fff!important;border:0!important;
@@ -540,8 +542,8 @@
     table.cal td.exam .n,table.cal td.exam .lbl{color:#0b6e8f!important}
     table.cal td.ev{background:#ffeed7!important}
     table.cal td.ev .n,table.cal td.ev .lbl{color:#a35a00!important}
-    table.cal td.mk{background:#ecdff7!important}
-    table.cal td.mk .n,table.cal td.mk .lbl{color:#5e1f6e!important}
+    table.cal td.mk{background:#7a2f96!important}
+    table.cal td.mk .n,table.cal td.mk .lbl{color:#fff!important}
     table.cal td.adm .n,table.cal td.adm .lbl{color:#6e6e6e!important}
     /* 인쇄에서는 학사 텍스트를 칸에 표시하지 않음 (옆 '이달의 주요 일정' 목록으로 충분) */
     table.cal .lbl.adm-lbl{display:none!important}
@@ -994,6 +996,7 @@ function computeFor(year, sem){
     if(total>0){const idx=Math.ceil(total*k/4)-1;if(idx>=0&&idx<total)quarters[toISO(classDays[idx])]=`${k}/4`;}
   });
   const endISO = total>0 ? toISO(classDays[total-1]) : null;
+  const openISO = total>0 ? toISO(classDays[0]) : null;   // 개강 표시 = 첫 실제 수업일 (시작일이 휴일이면 다음 수업일)
 
   // 요일별 실제 수업일수(휴업일 제외) / 전체 칸수
   const wdClass=[0,0,0,0,0], wdTotal=[0,0,0,0,0];
@@ -1002,7 +1005,7 @@ function computeFor(year, sem){
     wdClass[c]=arr.filter(d=>!(effMap[toISO(d)]&&effMap[toISO(d)].off)).length;
   });
 
-  return {start,end,valid,cols,rows,effMap,classDays,total,quarters,endISO,inRangeHol,holidays,wdClass,wdTotal};
+  return {start,end,valid,cols,rows,effMap,classDays,total,quarters,endISO,openISO,inRangeHol,holidays,wdClass,wdTotal};
 }
 
 /* ============================================================
@@ -1161,7 +1164,7 @@ function buildTableHTML(data,sem){
       const isOff=eff&&eff.off;
       const isExam=eff&&!isOff&&eff.kinds&&eff.kinds.has('exam');
       const isMakeup=eff&&!isOff&&eff.kinds&&eff.kinds.has('makeup');
-      const isStart=iso===t.start; const isEnd=iso===data.endISO;
+      const isStart=iso===(data.openISO||t.start); const isEnd=iso===data.endISO;
       let cls='day';
       if(isOff)cls+=' off';
       else if(isExam)cls+=' exam';
@@ -1275,7 +1278,7 @@ function semRange(year,sem){
   [1,2,3].forEach(k=>{
     if(total>0){const idx=Math.ceil(total*k/4)-1;if(idx>=0&&idx<total)quarters[classDays[idx]]=`${k}/4`;}
   });
-  return {start:t.start,end:total?classDays[total-1]:null,quarters,total};
+  return {start:total?classDays[0]:t.start,end:total?classDays[total-1]:null,quarters,total};
 }
 
 function calData(){
@@ -1353,7 +1356,7 @@ function renderCalendar(){
     '<span><i style="background:var(--off-bg);border-color:#e7a6a2"></i>공휴일·휴업일</span>'+
     '<span><i style="background:var(--mark-bg);border-color:var(--mark-line)"></i>개강·종강</span>'+
     '<span><i style="background:var(--exam-bg);border-color:var(--exam-text)"></i>시험</span>'+
-    '<span><i style="background:#efe3f8;border-color:#68217A"></i>보강</span>'+
+    '<span><i style="background:#7a2f96;border-color:#7a2f96"></i>보강</span>'+
     '<span><i style="background:var(--event-bg);border-color:var(--event-text)"></i>행사</span>'+
     '<span><i style="background:#fff;border-color:#44546a"></i>학사(텍스트만)</span></div>';
   html+='<div class="months">';
@@ -1601,7 +1604,7 @@ $('#btnXls').onclick=()=>{
         const isOff=eff&&eff.off;
         const isExam=eff&&!isOff&&eff.kinds.has('exam');
         const isMk=eff&&!isOff&&eff.kinds.has('makeup');
-        const isStart=iso===t.start,isEnd=iso===d.endISO;
+        const isStart=iso===(d.openISO||t.start),isEnd=iso===d.endISO;
         let st=BD+CTR, sub='';
         if(isOff){st+='background:#ffe1e0;color:#b30000;';sub=esc(eff.names[0]||'');}
         else if(isExam||isMk){
