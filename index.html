@@ -143,7 +143,8 @@
   .uchip.term{background:var(--term-bg);color:var(--term);border-color:#b9dfb4}
   .uchip.exam{background:var(--exam-bg);color:var(--exam);border-color:#b5dcec}
   .uchip.event{background:var(--event-bg);color:var(--event);border-color:#f0d5a8}
-  .uchip.mk{background:var(--mk-bg);color:var(--mk);border-color:#dcc3ec}
+  .uchip.mk{background:var(--mk);color:#fff;border-color:var(--mk)}
+  .uchip.mk .dd{background:#fff;color:var(--mk)}
   .uchip.adm{background:#eef1f5;color:var(--adm);border-color:#c8d0da}
 
   /* ---------- legend ---------- */
@@ -185,8 +186,8 @@
   table.cal td.exam .n,table.cal td.exam .lbl{color:var(--exam)}
   table.cal td.ev{background:var(--event-bg)}
   table.cal td.ev .n,table.cal td.ev .lbl{color:var(--event)}
-  table.cal td.mk{background:var(--mk-bg)}
-  table.cal td.mk .n,table.cal td.mk .lbl{color:var(--mk)}
+  table.cal td.mk{background:var(--mk)}
+  table.cal td.mk .n,table.cal td.mk .lbl,table.cal td.mk .lbl.adm-lbl{color:#fff}
   table.cal td .lbl.adm-lbl{color:var(--adm)}
   table.cal td.out{background:#f6f8fa}
   table.cal td.today{outline:2.5px solid var(--brand);outline-offset:-2.5px;border-radius:4px}
@@ -228,8 +229,9 @@
   table.weeks td.exam{background:var(--exam-bg)}
   table.weeks td.exam .ename{display:block;font-size:9.5px;font-weight:800;color:var(--exam);line-height:1.1;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  table.weeks td.makeup{background:var(--mk-bg)}
-  table.weeks td.makeup .ename{display:block;font-size:9.5px;font-weight:800;color:var(--mk);line-height:1.1;
+  table.weeks td.makeup{background:var(--mk)}
+  table.weeks td.makeup .d{color:#fff;font-weight:900}
+  table.weeks td.makeup .ename{display:block;font-size:9.5px;font-weight:800;color:#fff;line-height:1.1;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   table.weeks td.mark{background:var(--term-bg)}
   table.weeks td.mark .badge{display:block;width:fit-content;margin:3px auto 0;font-size:9.5px;font-weight:900;
@@ -239,7 +241,7 @@
   table.weeks td.bigo .chip{display:inline-block;margin:1px 3px 1px 0;font-size:10.5px;padding:1px 7px;border-radius:6px;
     background:var(--brand-soft);color:#3c5271;font-weight:700}
   table.weeks td.bigo .chip.exam{background:var(--exam-bg);color:var(--exam)}
-  table.weeks td.bigo .chip.mk{background:var(--mk-bg);color:var(--mk)}
+  table.weeks td.bigo .chip.mk{background:var(--mk);color:#fff}
   table.weeks td.bigo .chip.q{background:var(--term-bg);color:var(--term)}
   .tfoot{padding:12px 18px;border-top:1.5px solid var(--line-strong);background:#fbfcfe;
     font-size:13.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 20px;align-items:center}
@@ -765,7 +767,8 @@ function computeFor(year,sem){
     if(total>0){const idx=Math.ceil(total*k/4)-1;if(idx>=0&&idx<total)quarters[toISO(classDays[idx])]=`${k}/4`;}
   });
   const endISO=total>0?toISO(classDays[total-1]):null;
-  return{t,start,end,valid,cols,rows,effMap,classDays,total,quarters,endISO,inRangeHol};
+  const openISO=total>0?toISO(classDays[0]):null;   // 개강 표시 = 첫 실제 수업일 (시작일이 휴일이면 다음 수업일)
+  return{t,start,end,valid,cols,rows,effMap,classDays,total,quarters,endISO,openISO,inRangeHol};
 }
 
 function semRange(year,sem){
@@ -792,7 +795,7 @@ function semRange(year,sem){
   [1,2,3].forEach(k=>{
     if(total>0){const idx=Math.ceil(total*k/4)-1;if(idx>=0&&idx<total)quarters[classDays[idx]]=`${k}/4`;}
   });
-  return{start:t.start,end:total?classDays[total-1]:null,quarters,total};
+  return{start:total?classDays[0]:t.start,end:total?classDays[total-1]:null,quarters,total};
 }
 
 function calData(year){
@@ -916,10 +919,11 @@ function renderSemCards(){
       return;
     }
     const q={};Object.keys(d.quarters).forEach(iso=>q[d.quarters[iso]]=shortMD(fromISO(iso)));
-    const sd=fromISO(d.t.start),ed=d.endISO?fromISO(d.endISO):null;
+    const openISO=d.openISO||d.t.start;
+    const sd=fromISO(openISO),ed=d.endISO?fromISO(d.endISO):null;
     html+=`<div class="semcard">
       <div class="sh"><h2>${sem}학기</h2>
-        <span class="period">${d.t.start.replace(/-/g,'.')} ~ ${d.t.end.replace(/-/g,'.')}</span></div>
+        <span class="period">${openISO.replace(/-/g,'.')} ~ ${d.t.end.replace(/-/g,'.')}</span></div>
       <div class="sb">
         <div class="cell start"><div class="k">개강</div><div class="v">${shortMD(sd)}<small>(${WKShort[sd.getDay()]})</small></div></div>
         <div class="cell end"><div class="k">종강</div><div class="v">${ed?shortMD(ed):'–'}<small>${ed?`(${WKShort[ed.getDay()]})`:''}</small></div></div>
@@ -960,7 +964,7 @@ function renderCalendar(){
     <span><i style="background:var(--hol-bg);border-color:var(--hol)"></i>공휴일·휴업일</span>
     <span><i style="background:var(--term-bg);border-color:var(--term)"></i>개강·종강·분기</span>
     <span><i style="background:var(--exam-bg);border-color:var(--exam)"></i>시험</span>
-    <span><i style="background:var(--mk-bg);border-color:var(--mk)"></i>보강</span>
+    <span><i style="background:var(--mk);border-color:var(--mk)"></i>보강</span>
     <span><i style="background:var(--event-bg);border-color:var(--event)"></i>행사</span>
     <span><i style="background:#fff;border-color:var(--adm)"></i>학사(텍스트)</span></div>`;
   html+=`<div class="monthnav no-print" id="monthnav">`+
@@ -1037,7 +1041,7 @@ function buildTableHTML(data,sem){
       const isOff=eff&&eff.off;
       const isExam=eff&&!isOff&&eff.kinds.has('exam');
       const isMakeup=eff&&!isOff&&eff.kinds.has('makeup');
-      const isStart=iso===t.start;const isEnd=iso===data.endISO;
+      const isStart=iso===(data.openISO||t.start);const isEnd=iso===data.endISO;
       let cls='day';
       if(isOff)cls+=' off';
       else if(isExam)cls+=' exam';
