@@ -1537,6 +1537,23 @@ async function manualSync(){
   setupFeedback();
   const b=$('#btnSync');
   if(b){b.hidden=!!hash;b.onclick=manualSync;}    // 공유 링크 보기에서는 숨김
+  /* 첫 화면은 빠른 경로(웹에 게시 CSV)로 띄우되 그 경로는 구글이 최대 5분 늦게 갱신하므로,
+     곧바로 지연 없는 경로로 다시 읽어 바뀐 내용(의견수렴 기간·일정 등)이 있으면 갱신한다 */
+  if(!hash&&SHEET_ID){
+    try{
+      const sig=x=>JSON.stringify(coreOf(x))+'|'+(x.submitUrl||'');
+      const yearWas=V.year;
+      const r=await loadData(true);
+      lastLoadTs=Date.now();
+      if(r&&r.d&&String(r.src).startsWith('구글시트')&&sig(r.d)!==sig(D)){
+        D=r.d;
+        if(V.year===yearWas)V.year=initialYear();  // 아직 연도를 바꾸지 않았으면 기본 연도 다시 계산
+        $('#srcline').innerHTML=srcLine(r.src);
+        render();
+        setupFeedback();
+      }
+    }catch(e){}
+  }
 })();
 
 /* 탭에 다시 돌아왔을 때 5분 이상 지났으면 자동으로 다시 읽기

@@ -1440,7 +1440,7 @@ $('#year').onchange=e=>{state.year=+e.target.value;render();};
 document.querySelectorAll('#semSeg button').forEach(b=>b.onclick=()=>{state.sem=+b.dataset.sem;render();});
 document.querySelectorAll('#lockSeg button').forEach(b=>b.onclick=()=>{
   state.lockYear=+b.dataset.lock===1;render();
-  toast(state.lockYear?'뷰어에 현재 학년도만 표시됩니다 — 게시해야 적용됩니다':'뷰어에서 전체 연도를 열람할 수 있습니다 — 게시해야 적용됩니다');
+  toast((state.lockYear?'뷰어에 현재 학년도만 표시됩니다':'뷰어에서 전체 연도를 열람할 수 있습니다')+applyHint());
 });
 /* 우선 표시 : 지정 기간 동안 뷰어가 이 학년도를 먼저 보여주고 안내 배너를 띄움 */
 $('#btnPrio').onclick=()=>{
@@ -1451,7 +1451,7 @@ $('#btnPrio').onclick=()=>{
     '예: 2027, 2026-09-01 ~ 2026-10-31   (기간을 생략하면 상시 적용)\n'+
     '빈칸으로 [확인]하면 우선 표시를 해제합니다.',cur);
   if(txt===null)return;
-  if(!txt.trim()){state.priority=null;render();toast('우선 표시 해제 — [시트에 반영]을 눌러야 뷰어에 적용됩니다');return;}
+  if(!txt.trim()){state.priority=null;render();toast('우선 표시 해제'+applyHint());return;}
   const ym=txt.match(/\b(20\d{2})\b/);
   if(!ym){alert('우선 표시할 학년도(예: 2027)를 찾지 못했습니다');return;}
   const year=+ym[1];
@@ -1461,7 +1461,7 @@ $('#btnPrio').onclick=()=>{
   if(s&&e&&s>e)[s,e]=[e,s];
   state.priority={year,start:s,end:e};
   render();
-  toast(`${year}학년도 우선 표시 설정됨 — [시트에 반영]을 눌러야 뷰어에 적용됩니다`);
+  toast(`${year}학년도 우선 표시 설정됨`+applyHint());
 };
 /* ---- 날짜 자유 입력 파서 : 3/3 · 0303 · 20260303 · 2026-03-03 · 2026.3.3 · 2026년 3월 3일 ---- */
 function parseDateInput(v){
@@ -1805,6 +1805,20 @@ $('#btnData').onclick=()=>{
    - 뷰어에서 각 부서가 저장한 의견 파일({app:'academic_calendar_feedback'})을
      불러와 목록으로 보여주고, 추가/수정/삭제 제안은 [반영] 한 번으로 적용
    ============================================================ */
+/* 설정 변경 직후 안내 — 자동 반영이 켜져 있으면 곧 시트에 기록됨, 아니면 직접 반영 필요 */
+function applyHint(){
+  return (typeof autoPushOff!=='undefined'&&!autoPushOff&&lastPushed!==null)
+    ?' — 잠시 후 구글시트에 자동 반영되며, 뷰어는 새로고침하면 보입니다'
+    :' — [시트에 반영]을 눌러야 뷰어에 적용됩니다';
+}
+/* 의견 수렴 기간이 오늘 기준 진행 중인지 — 뷰어 배너는 진행 중일 때만 보인다 */
+function feedbackState(){
+  const f=state.feedback,today=toISO(new Date());
+  if(!f||!f.start)return'';
+  if(today<f.start)return ' <em>(시작 전 — 뷰어 배너는 '+f.start+'부터 표시)</em>';
+  if(today>f.end)return ' <em style="color:#b30000">(종료됨 — 뷰어에 배너가 표시되지 않습니다)</em>';
+  return ' <em style="color:#1b7a1b">(진행 중 — 뷰어에 [의견 제출] 배너 표시)</em>';
+}
 const escOp=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 let sheetOps=[];   // 시트 '의견' 탭에서 불러온 대기 건 (저장하지 않음 — 시트가 원본)
 /* 대상 일정의 현재 날짜 범위 — 화면의 일정에서 찾고, 없으면 제출 당시 기록(대상시작일)으로 대체 */
@@ -1825,7 +1839,7 @@ function renderOpinions(){
   const box=$('#opList'),line=$('#fbPeriodLine');
   if(!box||!line)return;
   line.innerHTML=state.feedback&&state.feedback.start
-    ?`의견 수렴 기간 : <b>${state.feedback.start} ~ ${state.feedback.end}</b> <em>([시트에 반영]해야 뷰어에 적용)</em>`
+    ?`의견 수렴 기간 : <b>${state.feedback.start} ~ ${state.feedback.end}</b>${feedbackState()}`
     :'의견 수렴 기간이 <b>설정되지 않았습니다</b>';
   const ops=state.opinions||[];
   $('#opCount').textContent=sheetOps.length+ops.filter(o=>o.status!=='done').length;
@@ -1985,7 +1999,7 @@ $('#btnFbPeriod').onclick=()=>{
   const cur=state.feedback&&state.feedback.start?`${state.feedback.start} ~ ${state.feedback.end}`:'';
   const txt=prompt('의견 수렴 기간을 입력하세요 (예: 2026-09-22 ~ 2026-09-30)\n빈칸으로 [확인]하면 수렴 기간을 해제합니다.',cur);
   if(txt===null)return;
-  if(!txt.trim()){state.feedback=null;render();toast('의견 수렴 기간 해제 — [시트에 반영]을 눌러야 뷰어에 적용됩니다');return;}
+  if(!txt.trim()){state.feedback=null;render();toast('의견 수렴 기간 해제'+applyHint());return;}
   const ds=txt.match(/\d{4}-\d{1,2}-\d{1,2}/g)||[];
   if(ds.length<2){alert('YYYY-MM-DD ~ YYYY-MM-DD 형식으로 시작일과 종료일을 입력해 주세요');return;}
   const norm=s=>{const[y,m,d]=s.split('-');return`${y}-${pad(+m)}-${pad(+d)}`;};
@@ -1993,7 +2007,7 @@ $('#btnFbPeriod').onclick=()=>{
   if(s>e)[s,e]=[e,s];
   state.feedback={start:s,end:e};
   render();
-  toast('의견 수렴 기간 설정됨 — [시트에 반영]을 눌러야 뷰어에 적용됩니다');
+  toast('의견 수렴 기간 설정됨'+applyHint());
 };
 const opFile=document.createElement('input');
 opFile.type='file';opFile.accept='.json,application/json';opFile.multiple=true;
