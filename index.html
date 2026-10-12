@@ -151,6 +151,7 @@
   .legend{display:flex;gap:14px 18px;flex-wrap:wrap;margin:0 0 14px;font-size:13px;color:var(--muted);align-items:center}
   .legend span{display:inline-flex;align-items:center;gap:6px;font-weight:600}
   .legend i{width:14px;height:14px;border-radius:4px;display:inline-block;border:1.5px solid}
+  .legend i.txt{border:0;background:none;width:auto;height:auto;font-style:normal;font-weight:800;font-size:13px;line-height:1;color:var(--adm)}
 
   /* ---------- month calendar ---------- */
   .months{display:grid;grid-template-columns:1fr;gap:18px}
@@ -966,7 +967,7 @@ function renderCalendar(){
     <span><i style="background:var(--exam-bg);border-color:var(--exam)"></i>시험</span>
     <span><i style="background:var(--mk);border-color:var(--mk)"></i>보강</span>
     <span><i style="background:var(--event-bg);border-color:var(--event)"></i>행사</span>
-    <span><i style="background:#fff;border-color:var(--adm)"></i>학사(텍스트)</span></div>`;
+    <span title="수강신청·등록 등 학사 일정은 칸 색 없이 글자로만 표시됩니다"><i class="txt">가</i>학사 일정</span></div>`;
   html+=`<div class="monthnav no-print" id="monthnav">`+
     monthsList.map(([yy,mm])=>`<button data-t="m-${yy}-${mm+1}" title="${yy}년 ${mm+1}월로 이동">${mm+1}월</button>`).join('')+
     `</div>`;
