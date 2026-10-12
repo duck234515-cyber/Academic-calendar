@@ -278,7 +278,8 @@
   .legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:var(--muted)}
   .legend span{display:inline-flex;align-items:center;gap:6px}
   .legend i{width:13px;height:13px;border-radius:4px;display:inline-block;border:1px solid var(--border-strong)}
-  .legend i.txt{border:0;background:none;width:auto;height:auto;font-style:normal;font-weight:800;font-size:13px;line-height:1;color:#44546a}
+  .legend .lgnote{font-weight:500;padding-left:12px;border-left:1px solid var(--border-strong,#c8d0da)}
+  .legend .lgnote b{font-weight:700}
 
   /* ---------- toast ---------- */
   #toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
@@ -1420,7 +1421,7 @@ function renderCalendar(){
     '<span><i style="background:var(--exam-bg);border-color:var(--exam-text)"></i>시험</span>'+
     '<span><i style="background:#7a2f96;border-color:#7a2f96"></i>보강</span>'+
     '<span><i style="background:var(--event-bg);border-color:var(--event-text)"></i>행사</span>'+
-    '<span title="수강신청·등록 등 학사 일정은 칸 색 없이 글자로만 표시됩니다"><i class="txt">가</i>학사 일정</span></div>';
+    '<span title="수강신청·등록 등 학사 일정은 칸 색 없이 글자로만 표시됩니다"><span class="lgnote">학사 일정(수강신청·등록 등)은 칸 색 없이 <b>글자로만</b> 표시</span></span></div>';
   html+='<div class="months">';
   monthsList.forEach(([yy,mm])=>{
     const first=new Date(yy,mm,1),dim=new Date(yy,mm+1,0).getDate();
