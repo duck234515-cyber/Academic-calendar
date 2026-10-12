@@ -34,8 +34,26 @@
 
   /* ---------- header ---------- */
   header.app{
-    display:flex;align-items:center;gap:14px;
-    padding:18px 28px;background:var(--surface);border-bottom:1px solid var(--border);
+    padding:14px 28px 12px;background:var(--surface);border-bottom:1px solid var(--border);
+  }
+  header.app .hrow{display:flex;align-items:center;gap:14px}
+  header.app .htitle{flex:1 1 auto;min-width:0}
+  header.app .htitle h1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header.app .htitle p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header.app .hside{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+  header.app .hsep{width:1px;height:24px;background:var(--border-strong);margin:0 4px}
+  header.app .hacts{display:flex;flex-wrap:wrap;align-items:center;gap:8px 26px;
+    margin-top:12px;padding-top:11px;border-top:1px solid var(--border)}
+  header.app .grp{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+  header.app .glab{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.4px;margin-right:4px}
+  header.app .hacts .btn{padding:7px 12px;font-size:12.5px}
+  @media (max-width:900px){
+    header.app{padding:12px 16px 10px}
+    header.app .hrow{flex-wrap:wrap}
+    header.app .htitle p{display:none}
+    header.app .hside{width:100%;flex-wrap:wrap}
+    header.app .hsep{display:none}
+    header.app .hacts{gap:8px 16px}
   }
   header.app .logo{
     width:40px;height:40px;border-radius:11px;background:var(--accent);color:#fff;
@@ -45,7 +63,6 @@
   .ver{display:inline-block;font-size:11px;font-weight:800;color:#fff;background:#E51400;
        padding:2px 8px;margin-left:6px;vertical-align:middle;letter-spacing:.3px}
   header.app p{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
-  header.app .spacer{flex:1}
   .btn{
     display:inline-flex;align-items:center;gap:7px;cursor:pointer;
     border:1px solid var(--border-strong);background:var(--surface);color:var(--text);
@@ -68,6 +85,16 @@
     padding:16px 28px;background:var(--surface);border-bottom:1px solid var(--border);
   }
   .field{display:flex;flex-direction:column;gap:5px}
+  .toolbar{gap:14px 14px}
+  .toolbar .tbreset{margin-left:auto}
+  .toolbar .tbbtns{display:flex;gap:2px}
+  .toolbar .tbbtns .btn{padding:8px 8px;font-size:12.5px}
+  .toolbar .field > .dwrap > .control{width:142px}
+  .toolbar select.control{min-width:0}
+  .toolbar #target{width:92px}
+  .toolbar .seg button{padding:0 14px}
+  .stat .k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  @media (max-width:560px){header.app .logo{display:none}header.app .htitle h1{white-space:normal}}
   .field > label{font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.2px;
                  text-transform:uppercase;display:flex;align-items:center;gap:5px}
   .control,select.control,input.control{
@@ -97,6 +124,8 @@
   /* ---------- layout ---------- */
   .layout{display:grid;grid-template-columns:340px 1fr;gap:22px;padding:22px 28px;align-items:start}
   @media (max-width:1080px){.layout{grid-template-columns:1fr}}
+  .layout>*{min-width:0}
+  @media (max-width:760px){.layout{padding:16px;gap:16px}.toolbar{padding:14px 16px}.toolbar .tbreset{margin-left:0}}
 
   /* ---------- 작업 영역 고정 : 스크롤해도 툴바·사이드바·요약이 화면에 유지 (넓은 화면 전용) ---------- */
   @media (min-width:1081px){
@@ -644,27 +673,37 @@ window.AC_PW_HASH_P=(async function(){
 })();
 </script>
 <header class="app">
+  <div class="hrow">
   <div class="logo">
     <svg class="icon" style="font-size:22px" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h3M7.5 16.5h6"/></svg>
   </div>
-  <div>
+    <div class="htitle">
     <h1>학사일정 · 수업일수표 생성기 <span class="ver">수정본 9/11-O</span></h1>
     <p>연도와 개강·종강일만 정하면 요일기준 수업일수표가 자동으로 만들어집니다 · 입력값은 자동 저장됩니다(새로고침해도 유지)</p>
+    </div>
+    <div class="hside">
+      <button class="btn" id="btnSyncG" title="구글시트의 최신 일정·설정·대기 의견을 지금 바로 다시 불러옵니다 (화면을 시트 기준으로 갱신)"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/></svg>동기화</button>
+      <button class="btn primary" id="btnSheetPush" title="이 화면의 일정으로 연동 구글시트를 다시 씁니다"><svg class="icon" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4l4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>시트에 반영</button>
+      <span class="hsep"></span>
+      <a class="btn ghost" href="./" id="lnkViewer" title="열람 전용 페이지 열기"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/></svg>뷰어 열기</a>
+      <button class="btn ghost" id="btnPw" title="관리자 비밀번호 변경"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5M12 14.5v2.5"/></svg>비밀번호</button>
+    </div>
   </div>
-  <div class="spacer"></div>
-  <button class="btn" id="btnPrintTable"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg>수업일수표 인쇄</button>
-  <button class="btn" id="btnPrintCal"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>학사일정 인쇄</button>
-  <button class="btn" id="btnPrintA3" title="A3 가로 용지에 연간(한 장) 또는 학기별(2장) 학사일정 출력"><svg class="icon" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 9.5h19M8 9.5v9.5M14 9.5v9.5"/></svg>A3 가로 출력</button>
-  <button class="btn" id="btnReport" title="시트 데이터로 학사일정 주요 내용 보고서(A4 가로 원페이퍼)를 만들어 인쇄"><svg class="icon" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg>보고서 출력</button>
-  <button class="btn primary" id="btnXls"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>엑셀 내보내기</button>
-  <button class="btn" id="btnShare"><svg class="icon" viewBox="0 0 24 24"><path d="M15 7a3 3 0 1 0 0-4 3 3 0 0 0 0 4zM6 14a3 3 0 1 0 0-4 3 3 0 0 0 0 4zm9 7a3 3 0 1 0 0-4 3 3 0 0 0 0 4zM8.6 10.5l4.8-2.7M8.6 13.5l4.8 2.7"/></svg>뷰어 공유 링크</button>
-  <button class="btn" id="btnData"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v10m0 0l-3.5-3.5M12 13l3.5-3.5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>뷰어 데이터 저장</button>
-  <button class="btn" id="btnImport" title="공유 링크·data.json 붙여넣기로 가져오기"><svg class="icon" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4l4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>가져오기</button>
-  <button class="btn" id="btnSheet" title="연동 구글시트의 현재 일정을 이 화면으로 불러오기"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>시트에서 불러오기</button>
-  <button class="btn" id="btnSyncG" title="구글시트의 최신 일정·설정·대기 의견을 지금 바로 다시 불러옵니다 (화면을 시트 기준으로 갱신)"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/></svg>동기화</button>
-  <button class="btn primary" id="btnSheetPush" title="이 화면의 일정으로 연동 구글시트를 다시 씁니다"><svg class="icon" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4l4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>시트에 반영</button>
-  <button class="btn ghost" id="btnPw" title="관리자 비밀번호 변경"><svg class="icon" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5M12 14.5v2.5"/></svg>비밀번호</button>
-  <a class="btn ghost" href="./" id="lnkViewer" title="열람 전용 페이지 열기"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/></svg>뷰어 열기</a>
+  <div class="hacts">
+    <div class="grp"><span class="glab">출력</span>
+      <button class="btn" id="btnPrintTable"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg>수업일수표 인쇄</button>
+      <button class="btn" id="btnPrintCal"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg>학사일정 인쇄</button>
+      <button class="btn" id="btnPrintA3" title="A3 가로 용지에 연간(한 장) 또는 학기별(2장) 학사일정 출력"><svg class="icon" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 9.5h19M8 9.5v9.5M14 9.5v9.5"/></svg>A3 가로 출력</button>
+      <button class="btn" id="btnReport" title="시트 데이터로 학사일정 주요 내용 보고서(A4 가로 원페이퍼)를 만들어 인쇄"><svg class="icon" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg>보고서 출력</button>
+      <button class="btn" id="btnXls"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>엑셀 내보내기</button>
+    </div>
+    <div class="grp"><span class="glab">데이터</span>
+      <button class="btn" id="btnSheet" title="연동 구글시트의 현재 일정을 이 화면으로 불러오기"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>시트에서 불러오기</button>
+      <button class="btn" id="btnImport" title="공유 링크·data.json 붙여넣기로 가져오기"><svg class="icon" viewBox="0 0 24 24"><path d="M12 15V3m0 0L8 7m4-4l4 4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>가져오기</button>
+      <button class="btn" id="btnData"><svg class="icon" viewBox="0 0 24 24"><path d="M12 3v10m0 0l-3.5-3.5M12 13l3.5-3.5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>뷰어 데이터 저장</button>
+      <button class="btn" id="btnShare"><svg class="icon" viewBox="0 0 24 24"><path d="M15 7a3 3 0 1 0 0-4 3 3 0 0 0 0 4zM6 14a3 3 0 1 0 0-4 3 3 0 0 0 0 4zm9 7a3 3 0 1 0 0-4 3 3 0 0 0 0 4zM8.6 10.5l4.8-2.7M8.6 13.5l4.8 2.7"/></svg>뷰어 공유 링크</button>
+    </div>
+  </div>
 </header>
 
 <div class="toolbar">
@@ -707,13 +746,9 @@ window.AC_PW_HASH_P=(async function(){
     <label><svg class="icon" viewBox="0 0 24 24"><path d="M12 17v5M5 9c0-3.9 3.1-7 7-7s7 3.1 7 7c0 2.4-1.2 4.5-3 5.7V17H8v-2.3C6.2 13.5 5 11.4 5 9z"/></svg>우선 표시 (점검·안내 기간)</label>
     <button class="btn" id="btnPrio" title="지정한 기간 동안 뷰어가 이 학년도를 먼저 보여주고 안내 배너를 띄웁니다"></button>
   </div>
-  <div class="field">
-    <label>&nbsp;</label>
-    <button class="btn ghost" id="btnReset"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/></svg>이 학기 기본값</button>
-  </div>
-  <div class="field">
-    <label>&nbsp;</label>
-    <button class="btn ghost" id="btnClearAll"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>전체 초기화</button>
+  <div class="field tbreset">
+    <div class="tbbtns"><button class="btn ghost" id="btnReset"><svg class="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5"/></svg>이 학기 기본값</button>
+    <button class="btn ghost" id="btnClearAll"><svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>전체 초기화</button></div>
   </div>
 </div>
 
@@ -733,7 +768,7 @@ window.AC_PW_HASH_P=(async function(){
       <div class="bd">
         <div class="addform">
           <div class="row">
-            <div class="minifield"><span>시작일</span><div class="dwrap"><input type="text" id="addDate" class="control" placeholder="4/20, 0420…" autocomplete="off"><button type="button" class="dpick" title="달력에서 선택"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg></button><input type="date" class="dnative" tabindex="-1"></div></div>
+            <div class="minifield"><span>시작일</span><div class="dwrap"><input type="text" id="addDate" class="control" placeholder="예: 4/20" autocomplete="off"><button type="button" class="dpick" title="달력에서 선택"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg></button><input type="date" class="dnative" tabindex="-1"></div></div>
             <div class="minifield"><span>종료일 <em>(선택)</em></span><div class="dwrap"><input type="text" id="addEnd" class="control" placeholder="4/24" autocomplete="off"><button type="button" class="dpick" title="달력에서 선택"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/></svg></button><input type="date" class="dnative" tabindex="-1"></div></div>
           </div>
           <input type="text" id="addName" class="control" placeholder="명칭 (예: 중간고사, 수강신청)">
