@@ -228,6 +228,9 @@
   table.weeks td.off .d{color:var(--hol);font-weight:900}
   table.weeks td.off .oname{display:block;font-size:9.5px;font-weight:800;color:var(--hol);line-height:1.1;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  table.weeks td.pad:not(.off){background:#f4f6f8}
+  table.weeks td.pad:not(.off) .d,table.weeks td.pad:not(.off) .oname{color:#9aa3ad}
+  table.weeks td.pad:not(.off) .oname{display:block;font-size:9.5px;font-weight:700;line-height:1.1}
   table.weeks td.exam{background:var(--exam-bg)}
   table.weeks td.exam .ename{display:block;font-size:9.5px;font-weight:800;color:var(--exam);line-height:1.1;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -326,14 +329,14 @@
 
   /* ---------- print ---------- */
   @media print{
-    @page{size:A4 portrait;margin:8mm}
+    @page{size:A4 landscape;margin:8mm}
     *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
     body{background:#fff}
     .topbar,.upcoming,footer,.yearnav .arrow,.no-print{display:none!important}
     .wrap{padding:0;max-width:none}
     .month,.tablewrap,.holsum,.lmonth,.semcard{page-break-inside:avoid;break-inside:avoid;border-radius:0;box-shadow:none}
     table.cal tr,table.weeks tr,table.hs tr{page-break-inside:avoid;break-inside:avoid}
-    .months,.listwrap{grid-template-columns:repeat(2,1fr);gap:8px}
+    .months,.listwrap{grid-template-columns:repeat(3,1fr);gap:8px}
     table.weeks{min-width:0}
   }
 </style>
@@ -351,7 +354,7 @@
     <button data-view="table"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>수업일수표</button>
     <button data-view="list"><svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>전체 일정</button>
   </div>
-  <button class="btnprint" onclick="window.print()"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg>인쇄</button>
+  <button class="btnprint" id="btnPrint" onclick="openPrint()" title="A4·A3 가로로 학사일정 인쇄"><svg class="icon" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a1 1 0 0 1-1 1h-2"/><rect x="6" y="14" width="12" height="7" rx="1"/></svg>인쇄</button>
   <button class="btnprint" id="btnAdmin" title="비밀번호 필요"><svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>관리자</button>
 </div>
 
@@ -770,7 +773,17 @@ function computeFor(year,sem){
   });
   const endISO=total>0?toISO(classDays[total-1]):null;
   const openISO=total>0?toISO(classDays[0]):null;   // 개강 표시 = 첫 실제 수업일 (시작일이 휴일이면 다음 수업일)
-  return{t,start,end,valid,cols,rows,effMap,classDays,total,quarters,endISO,openISO,inRangeHol};
+  /* 표 표시용 열 : 개강 주·종강 주의 학기 밖 평일도 채워 달력 주와 줄을 맞춤 (수업일수 계산엔 미포함) */
+  const padHol=iso=>{const ov=OV[iso]||{};if(ov.hidden)return null;
+    const h=holidays.filter(x=>x.iso===iso).map(x=>x.name);return h.length?h:null;};
+  const grid=cols.map(arr=>arr.map(d=>({d})));
+  if(valid){
+    const sw=start.getDay(),ew=end.getDay();
+    if(sw>=2&&sw<=5)for(let wd=1;wd<sw;wd++){const d=addDays(start,wd-sw);grid[wd-1].unshift({d,pad:'pre',hol:padHol(toISO(d))});}
+    if(ew>=1&&ew<=4)for(let wd=ew+1;wd<=5;wd++){const d=addDays(end,wd-ew);grid[wd-1].push({d,pad:'post',hol:padHol(toISO(d))});}
+  }
+  const gridRows=Math.max(...grid.map(c=>c.length),0);
+  return{t,start,end,valid,cols,rows,grid,gridRows,effMap,classDays,total,quarters,endISO,openISO,inRangeHol};
 }
 
 function semRange(year,sem){
@@ -856,6 +869,167 @@ function calData(year){
 }
 const cls3=tp=>({hol:'hol',off:'hol',exam:'exam',event:'event',term:'term',makeup:'mk',admin:'adm'}[tp]||'');
 const dlabel=(s,e)=>{const ds=fromISO(s);return(e&&e!==s)?`${shortMD(ds)}~${shortMD(fromISO(e))}`:`${shortMD(ds)}(${WKShort[ds.getDay()]})`;};
+
+/* ============================================================
+   인쇄 : 새 창에 가로 인쇄용 문서 (A4/A3 가로, 학기별 2장 / 연간 한 장)
+   ============================================================ */
+function printDoc(paper,mode){
+  const {y,monthsList,evMap,termLbl,items}=calData(V.year);
+  const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const md=iso=>{const d=fromISO(iso);return `${d.getMonth()+1}.${d.getDate()}`;};
+  const mdw=iso=>{const d=fromISO(iso);return `${d.getMonth()+1}.${d.getDate()}(${WKShort[d.getDay()]})`;};
+  const sems=[1,2].map(sem=>{
+    const r=semRange(y,sem),d=computeFor(y,sem);
+    const exams=usersOf(y,sem).filter(u=>u.kind==='exam').sort((a,b)=>a.iso<b.iso?-1:1)
+      .map(u=>`${E(u.name)} ${md(u.iso)}~${md(u.end||u.iso)}`).join(' · ');
+    const q={};Object.keys(r.quarters).forEach(iso=>q[r.quarters[iso]]=md(iso));
+    return {sem,start:r.start,end:r.end,total:r.total,weeks:d.rows,exams,
+      quarters:`1/4 ${q['1/4']||'–'} · 2/4 ${q['2/4']||'–'} · 3/4 ${q['3/4']||'–'}`};
+  });
+  const semBox=s=>`<div class="sem">
+      <span class="chip">${s.sem}학기</span>
+      <b class="rng">${s.start?mdw(s.start):'–'} ~ ${s.end?mdw(s.end):'–'}</b>
+      <span class="days"><b>${s.total}</b>일 · ${s.weeks}주</span>
+      <span class="sub">분기점 ${s.quarters}${s.exams?` <i>|</i> ${s.exams}`:''}</span></div>`;
+  const legend=`<div class="legend">
+      <span><i class="lg hol"></i>공휴일·휴업일</span><span><i class="lg term"></i>개강·종강·분기</span>
+      <span><i class="lg exam"></i>시험</span><span><i class="lg mk"></i>지정 보강</span>
+      <span><i class="lg ev"></i>행사</span><span><i class="lg adm"></i>학사</span></div>`;
+  const monthBox=([yy,mm],big)=>{
+    const first=new Date(yy,mm,1),dim=new Date(yy,mm+1,0).getDate();
+    let cells='',dow=first.getDay();
+    for(let i=0;i<dow;i++)cells+='<td class="out"></td>';
+    for(let dd=1;dd<=dim;dd++){
+      const d=new Date(yy,mm,dd),iso=toISO(d),wd=d.getDay(),ev=evMap[iso],tm=termLbl[iso];
+      const c=[];if(wd===0)c.push('sun');if(wd===6)c.push('sat');
+      if(ev&&(ev.kinds.has('hol')||ev.kinds.has('off')))c.push('hol');
+      else if(ev&&ev.kinds.has('makeup'))c.push('mk');
+      else if(ev&&ev.kinds.has('exam'))c.push('exam');
+      else if(tm)c.push('term');
+      else if(ev&&ev.kinds.has('event'))c.push('ev');
+      let lbl='';
+      if(tm)lbl+=`<span class="tl">${E(tm)}</span>`;
+      if(big&&ev){
+        ev.names.forEach(n=>lbl+=`<span class="nl">${E(n)}</span>`);
+        (ev.adm||[]).forEach(n=>lbl+=`<span class="nl adm">${E(n)}</span>`);
+      }
+      cells+=`<td class="${c.join(' ')}"><span class="n">${dd}</span>${lbl}</td>`;
+      if(wd===6&&dd<dim)cells+='</tr><tr>';
+    }
+    for(let i=new Date(yy,mm,dim).getDay()+1;i<7;i++)cells+='<td class="out"></td>';
+    const mS=new Date(yy,mm,1),mE=new Date(yy,mm+1,0);
+    const list=items.filter(it=>{const s=fromISO(it.s);return s>=mS&&s<=mE;})
+      .map(it=>`<div class="li ${cls3(it.type)}"><b>${dlabel(it.s,it.e)}</b> ${E(it.name)}</div>`).join('')
+      ||'<div class="none">일정 없음</div>';
+    return `<section class="month">
+      <h3>${mm+1}월<small>${yy}</small></h3>
+      <table class="cal"><thead><tr>${['일','월','화','수','목','금','토'].map((w,i)=>`<th class="${i===0?'sun':i===6?'sat':''}">${w}</th>`).join('')}</tr></thead>
+      <tbody><tr>${cells}</tr></tbody></table>
+      <div class="list">${list}</div></section>`;
+  };
+  const yearPage=`<div class="page year">
+      <header><div class="ttl"><h1>${y}학년도 학사일정</h1><span>${y}. 3. ~ ${y+1}. 2.</span></div>
+        <div class="sems">${sems.map(semBox).join('')}</div>${legend}</header>
+      <div class="grid g6">${monthsList.map(m=>monthBox(m,false)).join('')}</div></div>`;
+  const semPage=(s,months)=>`<div class="page semp">
+      <header><div class="ttl"><h1>${y}학년도 ${s.sem}학기 학사일정</h1></div>
+        <div class="sems">${semBox(s)}</div>${legend}</header>
+      <div class="grid g3">${months.map(m=>monthBox(m,true)).join('')}</div></div>`;
+  const semPages=semPage(sems[0],monthsList.slice(0,6))+semPage(sems[1],monthsList.slice(6));
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${y}학년도 학사일정</title>
+<style id="pgsz">@page{size:${paper} landscape;margin:8mm}</style>
+<style>
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{margin:0;background:#e9edf2;color:#1b2330;font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Pretendard",sans-serif}
+.bar{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:10px 16px;background:#1f3a5f;color:#fff;font-size:14px}
+.bar b{margin-right:6px}.bar button{border:0;border-radius:8px;padding:8px 14px;font:inherit;font-weight:700;cursor:pointer;background:#ffffff26;color:#fff}
+.bar button.on{background:#fff;color:#1f3a5f}.bar .pr{margin-left:auto;background:#f2c14e;color:#1b2330}
+.bar small{opacity:.85}.bar .grp{display:inline-flex;gap:4px;padding-right:10px;margin-right:2px;border-right:1px solid #ffffff40}
+.page{width:404mm;height:281mm;margin:10mm auto;background:#fff;padding:0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 4px 18px #0002}
+header{display:flex;align-items:center;gap:7mm;padding:0 0 3mm;border-bottom:.6mm solid #1f3a5f;margin-bottom:3mm}
+.ttl h1{margin:0;font-size:21pt;color:#1f3a5f;letter-spacing:-.5pt;white-space:nowrap}.ttl span{font-size:9pt;color:#5b6675}
+.sems{display:flex;gap:4mm;flex:1;min-width:0}
+.sem{flex:1;min-width:0;background:#eef2f7;border-radius:2.5mm;padding:2mm 3mm;display:grid;grid-template-columns:auto auto 1fr;grid-template-rows:auto auto;column-gap:2.5mm;align-items:center}
+.sem .chip{background:#1e7a2a;color:#fff;border-radius:4mm;padding:.6mm 2.6mm;font-size:9pt;font-weight:800}
+.sem .rng{font-size:12pt;color:#1f3a5f;white-space:nowrap}
+.sem .days{justify-self:end;font-size:9pt;color:#5b6675;white-space:nowrap}.sem .days b{font-size:16pt;color:#1e7a2a}
+.sem .sub{grid-column:1/-1;font-size:8pt;color:#33404f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sem .sub i{color:#aab4c0;font-style:normal}
+.legend{flex:none;display:grid;grid-template-columns:auto auto auto;gap:1mm 3mm;font-size:7.5pt;color:#5b6675;white-space:nowrap}
+.lg{display:inline-block;width:3mm;height:3mm;border-radius:.6mm;margin-right:1mm;vertical-align:-.4mm;border:.3mm solid}
+.lg.hol{background:#fdecec;border-color:#c9302a}.lg.term{background:#e4f4e2;border-color:#1e7a2a}.lg.exam{background:#def0f8;border-color:#0e7fa3}
+.lg.mk{background:#7a2f96;border-color:#7a2f96}.lg.ev{background:#fdf0da;border-color:#b06008}.lg.adm{width:.8mm;border:0;border-radius:0;background:#44546a;margin-left:1.1mm;margin-right:2.1mm}
+.grid{flex:1;display:grid;gap:3mm;min-height:0}
+.g6{grid-template-columns:repeat(6,1fr);grid-template-rows:1fr 1fr}
+.g3{grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr}
+.month{border:.3mm solid #aab4c0;border-radius:2mm;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.month h3{margin:0;background:#1f3a5f;color:#fff;font-size:11pt;padding:1.2mm 2.5mm;display:flex;align-items:baseline;gap:1.5mm}
+.month h3 small{font-size:7pt;font-weight:400;opacity:.75}
+table.cal{width:100%;border-collapse:collapse;table-layout:fixed;font-size:7.5pt}
+table.cal th{font-size:6.5pt;color:#5b6675;padding:.6mm 0;background:#fbfcfe;border-bottom:.3mm solid #aab4c0}
+table.cal th.sun,table.cal td.sun .n{color:#c9302a}table.cal th.sat,table.cal td.sat .n{color:#1b6ec2}
+table.cal td{border:.2mm solid #dde3ea;height:9mm;vertical-align:top;padding:.5mm .7mm;overflow:hidden}
+table.cal td .n{font-weight:800;display:block;line-height:1.1}
+table.cal td .tl{display:block;font-size:5.5pt;font-weight:800;line-height:1.1;color:#1e7a2a;white-space:nowrap;overflow:hidden}
+table.cal td .nl{display:block;font-size:6pt;line-height:1.15;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+table.cal td .nl.adm{color:#44546a;font-weight:600}
+table.cal td.out{background:#f6f8fa}
+table.cal td.hol{background:#fdecec}table.cal td.hol .n,table.cal td.hol .nl{color:#c9302a}
+table.cal td.exam{background:#def0f8}table.cal td.exam .n,table.cal td.exam .nl{color:#0b6e8f}
+table.cal td.term{background:#e4f4e2}table.cal td.term .n{color:#1e7a2a}
+table.cal td.ev{background:#fdf0da}table.cal td.ev .n,table.cal td.ev .nl{color:#a35a00}
+table.cal td.mk{background:#7a2f96}table.cal td.mk .n,table.cal td.mk .nl,table.cal td.mk .tl{color:#fff}
+.list{flex:1;min-height:0;overflow:hidden;padding:1.6mm 2mm;font-size:8.6pt;line-height:1.32;background:#fbfcfe;border-top:.3mm solid #aab4c0}
+.li{padding-left:1.6mm;border-left:.7mm solid #aab4c0;margin-bottom:.4mm}
+.li b{font-weight:800}
+.li.hol{border-color:#c9302a;color:#b3261e}.li.term{border-color:#1e7a2a;color:#1e7a2a}.li.exam{border-color:#0e7fa3;color:#0b6e8f}
+.li.event{border-color:#b06008;color:#a35a00}.li.mk{border-color:#7a2f96;color:#7a2f96}.li.adm{border-color:#44546a;color:#33404f}
+.none{color:#8b95a3;text-align:center;padding-top:2mm}
+.semp table.cal{font-size:9pt}.semp table.cal th{font-size:8pt}.semp table.cal td{height:11.5mm}
+.semp .month h3{font-size:13pt}.semp .list{font-size:9.6pt}
+body:not(.mode-sem) .semp,body.mode-sem .year{display:none}
+body.a4 .page{zoom:.688}
+body.a4 .list{font-size:12pt}body.a4 .semp .list{font-size:12.5pt}
+body.a4 table.cal{font-size:10pt}body.a4 table.cal th{font-size:8.5pt}
+body.a4 table.cal td .tl{font-size:7.5pt}body.a4 table.cal td .nl{font-size:8pt}
+body.a4 .sem .sub{font-size:10pt}body.a4 .legend{font-size:9.5pt}body.a4 .month h3{font-size:14pt}
+body.a4 .semp .month h3{font-size:16pt}
+@media print{body{background:#fff}.bar{display:none}.page{margin:0;box-shadow:none;page-break-after:always;break-after:page}.page:last-child{page-break-after:auto;break-after:auto}}
+</style></head><body>
+<div class="bar"><b>학사일정 인쇄</b>
+  <span class="grp"><button id="pA4">A4 가로</button><button id="pA3">A3 가로</button></span>
+  <span class="grp"><button id="mSem">학기별 2장</button><button id="mYear">연간 한 장</button></span>
+  <small id="hint"></small>
+  <button class="pr" onclick="window.print()">인쇄</button></div>
+${yearPage}${semPages}
+<script>
+var P='${paper}',M='${mode}';
+function fit(){var mn=P==='A4'?10:8;document.querySelectorAll('.page .list').forEach(function(l){
+  if(!l.offsetParent)return;l.style.fontSize='';var f=parseFloat(getComputedStyle(l).fontSize);
+  while(l.scrollHeight>l.clientHeight+1&&f>mn){f-=0.4;l.style.fontSize=f+'px';}});}
+function apply(){document.body.classList.toggle('mode-sem',M==='sem');document.body.classList.toggle('a4',P==='A4');
+  document.getElementById('pgsz').textContent='@page{size:'+P+' landscape;margin:8mm}';
+  [['pA4',P==='A4'],['pA3',P==='A3'],['mSem',M==='sem'],['mYear',M!=='sem']].forEach(function(x){document.getElementById(x[0]).classList.toggle('on',x[1]);});
+  document.getElementById('hint').textContent='인쇄 창에서 용지 '+P+' · 방향 가로 · 배경 그래픽 켜기';
+  try{localStorage.setItem('ac_print_pref',JSON.stringify({p:P,m:M}));}catch(e){}
+  fit();}
+document.getElementById('pA4').onclick=function(){P='A4';apply()};document.getElementById('pA3').onclick=function(){P='A3';apply()};
+document.getElementById('mYear').onclick=function(){M='year';apply()};document.getElementById('mSem').onclick=function(){M='sem';apply()};
+apply();window.addEventListener('load',fit);
+<\/script></body></html>`;
+}
+function openPrint(){
+  if(V.view==='table'){   // 수업일수표 화면 : 표는 세로 A4가 알맞아 현재 화면을 세로로 인쇄
+    let st=document.getElementById('pgPortrait');
+    if(!st){st=document.createElement('style');st.id='pgPortrait';document.head.appendChild(st);}
+    st.textContent='@media print{@page{size:A4 portrait;margin:8mm}}';
+    window.print();setTimeout(()=>{st.textContent='';},1000);return;
+  }
+  let pref={p:'A4',m:'sem'};
+  try{const s=JSON.parse(localStorage.getItem('ac_print_pref')||'null');if(s&&s.p)pref=s;}catch(e){}
+  const w=window.open('','_blank');
+  if(!w){window.print();return;}   // 팝업이 막힌 환경 : 현재 화면 인쇄로 대체
+  w.document.open();w.document.write(printDoc(pref.p==='A3'?'A3':'A4',pref.m==='year'?'year':'sem'));w.document.close();
+}
 
 /* ============================================================
    3. 렌더링
@@ -1033,12 +1207,17 @@ function buildTableHTML(data,sem){
   const t=data.t;
   const hdW=['월','화','수','목','금'];
   let body='';
-  for(let r=0;r<data.rows;r++){
+  for(let r=0;r<data.gridRows;r++){
     let tds=`<td class="wk">${r+1}</td>`;
     let notes=[];
     for(let c=0;c<5;c++){
-      const d=data.cols[c][r];
+      const g=data.grid[c][r],d=g&&g.d;
       if(!d){tds+='<td class="day"></td>';continue;}
+      if(g.pad){   // 학기 밖 날짜 : 휴일이면 휴일 칸, 아니면 흐린 칸
+        tds+=g.hol?`<td class="day off pad"><span class="d">${shortMD(d)}</span><span class="oname">${g.hol[0]}</span></td>`
+                  :`<td class="day pad"><span class="d">${shortMD(d)}</span><span class="oname">${g.pad==='pre'?'개강 전':'종강 후'}</span></td>`;
+        continue;
+      }
       const iso=toISO(d);const eff=data.effMap[iso];
       const isOff=eff&&eff.off;
       const isExam=eff&&!isOff&&eff.kinds.has('exam');
@@ -1078,6 +1257,7 @@ function buildTableHTML(data,sem){
     const d=fromISO(iso);const wd=d.getDay();
     if(wd>=1&&wd<=5)offByCol[wd-1].push({d,names:data.effMap[iso].names});
   });
+  data.grid.forEach((col,c)=>col.forEach(g=>{if(g.pad&&g.hol)offByCol[c].push({d:g.d,names:g.hol});}));
   offByCol.forEach(c=>c.sort((a,b)=>a.d-b.d));
   const maxOff=Math.max(...offByCol.map(c=>c.length),0);
   let hsRows='';
