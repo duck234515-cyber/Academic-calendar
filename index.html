@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>학사일정 안내</title>
+<title>신성대학교 학사일정</title>
+<link rel="icon" type="image/png" href="assets/ci-emblem-64.png">
+<link rel="apple-touch-icon" href="assets/ci-emblem-256.png">
 <style>
   :root{
     --bg:#f3f5f8; --surface:#ffffff; --line:#dde3ea; --line-strong:#aab4c0;
@@ -38,6 +40,11 @@
   }
   .topbar .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;letter-spacing:-.3px;padding:10px 0}
   .topbar .brand .icon{font-size:22px}
+  .topbar .brand .ci-em{width:34px;height:34px;flex:none;background:#fff;border-radius:50%;padding:1px}
+  .topbar .brand .ci-wm{height:26px;width:auto;flex:none}
+  .topbar .brand .ci-sep{width:1px;height:20px;background:rgba(255,255,255,.45);margin:0 2px}
+  @media (max-width:520px){.topbar .brand .ci-wm,.topbar .brand .ci-sep{display:none}.topbar .brand .ci-tx::before{content:"신성대학교 "}}
+  @media (max-width:520px){.tabs{width:100%}.tabs button{flex:1;justify-content:center;white-space:nowrap;padding:9px 6px;font-size:13px;gap:5px}}
   .topbar .spacer{flex:1}
   .tabs{display:flex;gap:4px;padding:8px 0}
   .tabs button{
@@ -346,8 +353,9 @@
 <script id="published-data" type="application/json">null</script>
 <div class="topbar">
   <div class="brand">
-    <svg class="icon" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h3M7.5 16.5h6"/></svg>
-    학사일정 안내
+    <img class="ci-em" src="assets/ci-emblem-64.png" alt="">
+    <img class="ci-wm" src="assets/ci-wordmark-white.png" alt="신성대학교">
+    <span class="ci-sep"></span><span class="ci-tx">학사일정 안내</span>
   </div>
   <div class="spacer"></div>
   <div class="tabs" id="tabs">
@@ -874,6 +882,9 @@ const dlabel=(s,e)=>{const ds=fromISO(s);return(e&&e!==s)?`${shortMD(ds)}~${shor
 /* ============================================================
    인쇄 : 새 창에 가로 인쇄용 문서 (A4/A3 가로, 학기별 2장 / 연간 한 장)
    ============================================================ */
+/* 인쇄 창용 학교 CI : 새 창(about:blank)은 이미지 로딩이 늦거나 막힐 수 있어 미리 읽어 data URL로 넣는다 */
+let CI_FULL=new URL('assets/ci-full.png',location.href).href;
+try{fetch(CI_FULL).then(r=>r.ok?r.blob():null).then(b=>{if(!b)return;const fr=new FileReader();fr.onload=()=>{CI_FULL=fr.result;};fr.readAsDataURL(b);}).catch(()=>{});}catch(e){}
 function printDoc(paper,mode){
   const {y,monthsList,evMap,termLbl,items}=calData(V.year);
   const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -929,11 +940,11 @@ function printDoc(paper,mode){
       <div class="list">${list}</div></section>`;
   };
   const yearPage=`<div class="page year">
-      <header><div class="ttl"><h1>${y}학년도 학사일정</h1><span>${y}. 3. ~ ${y+1}. 2.</span></div>
+      <header><img class="ci" src="${CI_FULL}" alt="신성대학교"><div class="ttl"><h1>${y}학년도 학사일정</h1><span>${y}. 3. ~ ${y+1}. 2.</span></div>
         <div class="sems">${sems.map(semBox).join('')}</div>${legend}</header>
       <div class="grid g6">${monthsList.map(m=>monthBox(m,false)).join('')}</div></div>`;
   const semPage=(s,months)=>`<div class="page semp">
-      <header><div class="ttl"><h1>${y}학년도 ${s.sem}학기 학사일정</h1></div>
+      <header><img class="ci" src="${CI_FULL}" alt="신성대학교"><div class="ttl"><h1>${y}학년도 ${s.sem}학기 학사일정</h1></div>
         <div class="sems">${semBox(s)}</div>${legend}</header>
       <div class="grid g3">${months.map(m=>monthBox(m,true)).join('')}</div></div>`;
   const semPages=semPage(sems[0],monthsList.slice(0,6))+semPage(sems[1],monthsList.slice(6));
@@ -948,6 +959,7 @@ body{margin:0;background:#e9edf2;color:#1b2330;font-family:"Malgun Gothic","맑�
 .bar small{opacity:.85}.bar .grp{display:inline-flex;gap:4px;padding-right:10px;margin-right:2px;border-right:1px solid #ffffff40}
 .page{width:404mm;height:281mm;margin:10mm auto;background:#fff;padding:0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 4px 18px #0002}
 header{display:flex;align-items:center;gap:7mm;padding:0 0 3mm;border-bottom:.6mm solid #1f3a5f;margin-bottom:3mm}
+header img.ci{height:12mm;width:auto;flex:none}
 .ttl h1{margin:0;font-size:21pt;color:#1f3a5f;letter-spacing:-.5pt;white-space:nowrap}.ttl span{font-size:9pt;color:#5b6675}
 .sems{display:flex;gap:4mm;flex:1;min-width:0}
 .sem{flex:1;min-width:0;background:#eef2f7;border-radius:2.5mm;padding:2mm 3mm;display:grid;grid-template-columns:auto auto 1fr;grid-template-rows:auto auto;column-gap:2.5mm;align-items:center}
@@ -1021,7 +1033,7 @@ apply();window.addEventListener('load',fit);
 /* 수업일수표 인쇄 : 학기마다 A4 세로 한 장 — 표 줄 높이를 남은 공간에 맞춰 늘리거나 줄임 */
 function tableDoc(){
   const y=V.year;
-  const pages=[1,2].map(sem=>{const d=computeFor(y,sem);return d.valid?`<div class="page">${buildTableHTML(d,sem)}</div>`:'';}).join('');
+  const pages=[1,2].map(sem=>{const d=computeFor(y,sem);return d.valid?`<div class="page"><img class="ci" src="${CI_FULL}" alt="신성대학교">${buildTableHTML(d,sem)}</div>`:'';}).join('');
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${y}학년도 수업일수표</title>
 <style>
 @page{size:A4 portrait;margin:8mm}
@@ -1030,7 +1042,8 @@ body{margin:0;background:#e9edf2;color:#1b2330;font-family:"Malgun Gothic","맑�
 .bar{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:10px 16px;background:#1f3a5f;color:#fff;font-size:14px}
 .bar button{border:0;border-radius:8px;padding:8px 14px;font:inherit;font-weight:700;cursor:pointer;background:#f2c14e;color:#1b2330;margin-left:auto}
 .bar small{opacity:.85}
-.page{width:194mm;height:281mm;margin:10mm auto;background:#fff;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 4px 18px #0002}
+.page{position:relative;width:194mm;height:281mm;margin:10mm auto;background:#fff;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 4px 18px #0002}
+.page img.ci{position:absolute;right:0;top:0;height:8mm;width:auto}
 .semtitle{display:flex;align-items:center;gap:3mm;margin:0 0 3mm;font-size:16pt;font-weight:900;letter-spacing:-.3pt}
 .semtitle .bar{position:static;padding:0;width:1.6mm;height:6.5mm;background:#0b62c4;border-radius:.5mm}
 .semtitle .range{font-size:10pt;color:#5b6675;font-weight:600}
