@@ -338,6 +338,7 @@
     table.cal tr,table.weeks tr,table.hs tr{page-break-inside:avoid;break-inside:avoid}
     .months,.listwrap{grid-template-columns:repeat(3,1fr);gap:8px}
     table.weeks{min-width:0}
+    .tscroll{overflow:visible}
   }
 </style>
 </head>
@@ -1017,8 +1018,74 @@ document.getElementById('mYear').onclick=function(){M='year';apply()};document.g
 apply();window.addEventListener('load',fit);
 <\/script></body></html>`;
 }
+/* 수업일수표 인쇄 : 학기마다 A4 세로 한 장 — 표 줄 높이를 남은 공간에 맞춰 늘리거나 줄임 */
+function tableDoc(){
+  const y=V.year;
+  const pages=[1,2].map(sem=>{const d=computeFor(y,sem);return d.valid?`<div class="page">${buildTableHTML(d,sem)}</div>`:'';}).join('');
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>${y}학년도 수업일수표</title>
+<style>
+@page{size:A4 portrait;margin:8mm}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{margin:0;background:#e9edf2;color:#1b2330;font-family:"Malgun Gothic","맑은 고딕","Apple SD Gothic Neo","Pretendard",sans-serif}
+.bar{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:10px 16px;background:#1f3a5f;color:#fff;font-size:14px}
+.bar button{border:0;border-radius:8px;padding:8px 14px;font:inherit;font-weight:700;cursor:pointer;background:#f2c14e;color:#1b2330;margin-left:auto}
+.bar small{opacity:.85}
+.page{width:194mm;height:281mm;margin:10mm auto;background:#fff;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 4px 18px #0002}
+.semtitle{display:flex;align-items:center;gap:3mm;margin:0 0 3mm;font-size:16pt;font-weight:900;letter-spacing:-.3pt}
+.semtitle .bar{position:static;padding:0;width:1.6mm;height:6.5mm;background:#0b62c4;border-radius:.5mm}
+.semtitle .range{font-size:10pt;color:#5b6675;font-weight:600}
+.tablewrap{flex:1;min-height:0;display:flex;flex-direction:column;border:.45mm solid #333}
+.tscroll{flex:1;min-height:0}
+table.weeks{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10pt}
+table.weeks th,table.weeks td{border:.25mm solid #666;padding:.5mm 1mm;text-align:center;vertical-align:middle;overflow:hidden}
+table.weeks thead th{background:#ffe680;height:8mm;font-size:11pt;font-weight:800}
+table.weeks th:first-child,table.weeks td.wk{width:8%}
+table.weeks th:last-child,table.weeks td.bigo{width:21%}
+table.weeks td.wk{background:#d9ebfb;color:#00427e;font-weight:900;font-size:11pt}
+table.weeks td .d{display:block;font-size:12pt;font-weight:800;line-height:1.15}
+table.weeks td .oname,table.weeks td .ename{display:block;font-size:7.5pt;font-weight:800;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+table.weeks td.off{background:#ffe1e0}table.weeks td.off .d,table.weeks td.off .oname{color:#b30000}
+table.weeks td.pad:not(.off){background:#f2f2f2}table.weeks td.pad:not(.off) .d,table.weeks td.pad:not(.off) .oname{color:#999;font-weight:600}
+table.weeks td.exam{background:#b0e0f4}table.weeks td.exam .ename{color:#085a75}
+table.weeks td.makeup{background:#7a2f96}table.weeks td.makeup .d,table.weeks td.makeup .ename{color:#fff}
+table.weeks td.mark{background:#e0f3da}
+table.weeks td.mark .badge{display:block;width:fit-content;margin:.6mm auto 0;font-size:7.5pt;font-weight:900;color:#fff;background:#1b7a1b;padding:.2mm 1.6mm;line-height:1.35}
+table.weeks td.end .badge{background:#00427e}
+table.weeks td.bigo{text-align:left;font-size:8pt;line-height:1.25}
+table.weeks td.bigo .chip{display:inline-block;margin:.3mm .8mm .3mm 0;padding:0 1.2mm;border:.25mm solid #666;font-size:7.5pt;font-weight:700}
+table.weeks td.bigo .chip.exam{color:#0b6e8f;border-color:#0b6e8f}
+table.weeks td.bigo .chip.mk{color:#5e1f6e;border-color:#5e1f6e}
+table.weeks td.bigo .chip.q{color:#1b7a1b;border-color:#1b7a1b}
+.tfoot{display:flex;flex-wrap:wrap;gap:1mm 5mm;align-items:center;padding:1.8mm 3mm;border-top:.45mm solid #333;background:#f5f5f5;font-size:9.5pt;color:#333}
+.tfoot b{font-size:11pt}.tfoot .q{color:#1b7a1b;font-weight:800}
+.holsum{margin-top:3mm;border:.45mm solid #333}
+.holsum .ttl{background:#0b62c4;color:#fff;font-weight:800;padding:1.4mm 3mm;font-size:10.5pt}
+table.hs{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9pt}
+table.hs th,table.hs td{border:.25mm solid #666;padding:1mm;text-align:center;vertical-align:middle}
+table.hs th{background:#ffe680;font-weight:800}
+table.hs th:first-child,table.hs td.lab{width:12%}
+table.hs td.lab{background:#d9ebfb;color:#00427e;font-weight:900}
+table.hs td .hday{font-weight:900;color:#b30000}
+table.hs td .hname{display:block;font-size:7.5pt;color:#b30000}
+.hsnote{padding:1.4mm 3mm;font-size:8.5pt;font-weight:700;border-top:.25mm solid #666}
+@media print{body{background:#fff}.bar{display:none}.page{margin:0;box-shadow:none;page-break-after:always;break-after:page}.page:last-child{page-break-after:auto;break-after:auto}}
+</style></head><body>
+<div class="bar"><b>수업일수표 인쇄</b><small>학기마다 A4 세로 한 장 · 인쇄 창에서 용지 A4 · 방향 세로 · 배경 그래픽 켜기</small>
+  <button onclick="window.print()">인쇄</button></div>
+${pages||'<p style="text-align:center">표시할 수업일수표가 없습니다.</p>'}
+<script>
+function rows(){[].forEach.call(document.querySelectorAll('.page'),function(pg){
+  var ts=pg.querySelector('.tscroll'),th=pg.querySelector('table.weeks thead'),trs=pg.querySelectorAll('table.weeks tbody tr');
+  if(!ts||!trs.length)return;[].forEach.call(trs,function(tr){tr.style.height='';});
+  var h=Math.floor((ts.clientHeight-th.offsetHeight)/trs.length)-1;
+  [].forEach.call(trs,function(tr){tr.style.height=h+'px';});});}
+rows();window.addEventListener('load',rows);
+<\/script></body></html>`;
+}
 function openPrint(){
-  if(V.view==='table'){   // 수업일수표 화면 : 표는 세로 A4가 알맞아 현재 화면을 세로로 인쇄
+  if(V.view==='table'){   // 수업일수표 화면 : 학기별 A4 세로 한 장씩
+    const w=window.open('','_blank');
+    if(w){w.document.open();w.document.write(tableDoc());w.document.close();return;}
     let st=document.getElementById('pgPortrait');
     if(!st){st=document.createElement('style');st.id='pgPortrait';document.head.appendChild(st);}
     st.textContent='@media print{@page{size:A4 portrait;margin:8mm}}';
