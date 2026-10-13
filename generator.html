@@ -6,7 +6,9 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>학사일정 · 수업일수표 생성기</title>
+<title>신성대학교 학사일정 · 수업일수표 생성기</title>
+<link rel="icon" type="image/png" href="assets/ci-emblem-64.png">
+<link rel="apple-touch-icon" href="assets/ci-emblem-256.png">
 <style>
   :root{
     --bg:#e9e9e9; --surface:#ffffff; --panel:#eef0f2;
@@ -60,6 +62,8 @@
     display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;
   }
   header.app h1{font-size:17px;margin:0;font-weight:700;letter-spacing:-.2px}
+  header.app img.logo.ci{background:none!important;width:42px;height:42px;padding:0}
+  header.app h1 .univ{color:#2a7a4a;font-weight:800;margin-right:2px}
   .ver{display:inline-block;font-size:11px;font-weight:800;color:#fff;background:#E51400;
        padding:2px 8px;margin-left:6px;vertical-align:middle;letter-spacing:.3px}
   header.app p{margin:2px 0 0;font-size:12.5px;color:var(--muted)}
@@ -676,11 +680,9 @@ window.AC_PW_HASH_P=(async function(){
 </script>
 <header class="app">
   <div class="hrow">
-  <div class="logo">
-    <svg class="icon" style="font-size:22px" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 2.5v4M16 2.5v4"/><path d="M7.5 13.5h3M7.5 16.5h6"/></svg>
-  </div>
+  <img class="logo ci" src="assets/ci-emblem-64.png" alt="신성대학교">
     <div class="htitle">
-    <h1>학사일정 · 수업일수표 생성기 <span class="ver">수정본 9/11-O</span></h1>
+    <h1><span class="univ">신성대학교</span> 학사일정 · 수업일수표 생성기 <span class="ver">수정본 9/11-O</span></h1>
     <p>연도와 개강·종강일만 정하면 요일기준 수업일수표가 자동으로 만들어집니다 · 입력값은 자동 저장됩니다(새로고침해도 유지)</p>
     </div>
     <div class="hside">
@@ -1613,6 +1615,9 @@ $('#btnPrintCal').onclick=()=>printMode('print-cal');
    - 한 장(기본): 12개월을 6×2로, 위쪽에 학기 요약
    - 학기별 2장: 1학기(3~8월) / 2학기(9~2월)를 3×2로, 칸 안에 일정 이름까지
    ============================================================ */
+/* 인쇄 창용 학교 CI : 새 창(about:blank)은 이미지 로딩이 늦거나 막힐 수 있어 미리 읽어 data URL로 넣는다 */
+let CI_FULL=new URL('assets/ci-full.png',location.href).href;
+try{fetch(CI_FULL).then(r=>r.ok?r.blob():null).then(b=>{if(!b)return;const fr=new FileReader();fr.onload=()=>{CI_FULL=fr.result;};fr.readAsDataURL(b);}).catch(()=>{});}catch(e){}
 function a3Doc(){
   const {y,monthsList,evMap,termLbl,items}=calData();
   const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -1668,11 +1673,11 @@ function a3Doc(){
       <div class="list">${list}</div></section>`;
   };
   const yearPage=`<div class="page year">
-      <header><div class="ttl"><h1>${y}학년도 학사일정</h1><span>${y}. 3. ~ ${y+1}. 2.</span></div>
+      <header><img class="ci" src="${CI_FULL}" alt="신성대학교"><div class="ttl"><h1>${y}학년도 학사일정</h1><span>${y}. 3. ~ ${y+1}. 2.</span></div>
         <div class="sems">${sems.map(semBox).join('')}</div>${legend}</header>
       <div class="grid g6">${monthsList.map(m=>monthBox(m,false)).join('')}</div></div>`;
   const semPage=(s,months)=>`<div class="page semp">
-      <header><div class="ttl"><h1>${y}학년도 ${s.sem}학기 학사일정</h1></div>
+      <header><img class="ci" src="${CI_FULL}" alt="신성대학교"><div class="ttl"><h1>${y}학년도 ${s.sem}학기 학사일정</h1></div>
         <div class="sems">${semBox(s)}</div>${legend}</header>
       <div class="grid g3">${months.map(m=>monthBox(m,true)).join('')}</div></div>`;
   const semPages=semPage(sems[0],monthsList.slice(0,6))+semPage(sems[1],monthsList.slice(6));
@@ -1687,6 +1692,7 @@ body{margin:0;background:#e9edf2;color:#1b2330;font-family:"Malgun Gothic","맑�
 .bar small{opacity:.8}
 .page{width:404mm;height:281mm;margin:10mm auto;background:#fff;padding:0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 4px 18px #0002}
 header{display:flex;align-items:center;gap:7mm;padding:0 0 3mm;border-bottom:.6mm solid #1f3a5f;margin-bottom:3mm}
+header img.ci{height:12mm;width:auto;flex:none}
 .ttl h1{margin:0;font-size:21pt;color:#1f3a5f;letter-spacing:-.5pt;white-space:nowrap}.ttl span{font-size:9pt;color:#5b6675}
 .sems{display:flex;gap:4mm;flex:1;min-width:0}
 .sem{flex:1;min-width:0;background:#eef2f7;border-radius:2.5mm;padding:2mm 3mm;display:grid;grid-template-columns:auto auto 1fr;grid-template-rows:auto auto;column-gap:2.5mm;align-items:center}
@@ -1895,6 +1901,7 @@ body.edit [data-ed]:focus{box-shadow:0 0 0 .5mm #e0a800;background:#fffbe8}
 .hd{display:flex;align-items:flex-end;justify-content:space-between}
 .hd h1{margin:0;font-size:23pt;color:#1f3a5f;letter-spacing:-.5pt}
 .hd .dt{font-size:10pt;color:#5b6675}
+.hd .hr{display:flex;flex-direction:column;align-items:flex-end;gap:1mm}.hd img.ci{height:9mm;width:auto}
 .key{background:#1f3a5f;color:#fff;border-radius:2mm;padding:2.4mm 5mm;font-size:11pt}
 .key b{color:#f2c14e;margin-right:2.5mm}
 .sems{display:grid;grid-template-columns:1fr 1fr;gap:6mm}
@@ -1941,7 +1948,7 @@ b.r{color:#d0021b}
   <button id="rst">자동 내용으로 되돌리기</button>
   <button class="pr" onclick="window.print()">인쇄</button></div>
 <div class="page">
-  <div class="hd"><h1 data-ed="title">${y}학년도 학사일정 주요 내용 보고</h1><span class="dt" data-ed="date">${today}</span></div>
+  <div class="hd"><h1 data-ed="title">${y}학년도 학사일정 주요 내용 보고</h1><div class="hr"><img class="ci" src="${CI_FULL}" alt="신성대학교"><span class="dt" data-ed="date">${today}</span></div></div>
   <div class="key" data-ed="key"><b>핵심</b>${key}</div>
   <div class="sems">${semCard(s1)}${semCard(s2)}</div>
   <div class="tl">${tl}
