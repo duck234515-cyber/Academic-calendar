@@ -1095,20 +1095,38 @@ function rows(){[].forEach.call(document.querySelectorAll('.page'),function(pg){
 rows();window.addEventListener('load',rows);
 <\/script></body></html>`;
 }
+/* [인쇄] : 누를 때마다 시트에서 최신 일정을 다시 읽은 뒤 인쇄물을 만든다
+   (창은 클릭 즉시 열어야 팝업 차단을 피하므로 '불러오는 중'을 먼저 띄우고 내용을 채움) */
+async function freshForPrint(){
+  if(decodeShare()||!SHEET_ID)return;                    // 공유 링크 보기는 링크에 담긴 데이터 그대로
+  try{await Promise.race([refreshData(),new Promise(r=>setTimeout(r,8000))]);}catch(e){}
+}
 function openPrint(){
-  if(V.view==='table'){   // 수업일수표 화면 : 학기별 A4 세로 한 장씩
-    const w=window.open('','_blank');
-    if(w){w.document.open();w.document.write(tableDoc());w.document.close();return;}
-    let st=document.getElementById('pgPortrait');
-    if(!st){st=document.createElement('style');st.id='pgPortrait';document.head.appendChild(st);}
-    st.textContent='@media print{@page{size:A4 portrait;margin:8mm}}';
-    window.print();setTimeout(()=>{st.textContent='';},1000);return;
-  }
-  let pref={p:'A4',m:'sem'};
-  try{const s=JSON.parse(localStorage.getItem('ac_print_pref')||'null');if(s&&s.p)pref=s;}catch(e){}
+  const isTable=V.view==='table';
   const w=window.open('','_blank');
-  if(!w){window.print();return;}   // 팝업이 막힌 환경 : 현재 화면 인쇄로 대체
-  w.document.open();w.document.write(printDoc(pref.p==='A3'?'A3':'A4',pref.m==='year'?'year':'sem'));w.document.close();
+  if(!w){                                                 // 팝업이 막힌 환경 : 최신 데이터로 현재 화면 인쇄
+    freshForPrint().then(()=>{
+      let st=document.getElementById('pgPortrait');
+      if(!st){st=document.createElement('style');st.id='pgPortrait';document.head.appendChild(st);}
+      st.textContent=isTable?'@media print{@page{size:A4 portrait;margin:8mm}}':'';
+      window.print();setTimeout(()=>{st.textContent='';},1000);
+    });
+    return;
+  }
+  w.document.open();
+  w.document.write('<!doctype html><meta charset="utf-8"><title>인쇄 준비</title><body style="font-family:Malgun Gothic,sans-serif;display:flex;align-items:center;justify-content:center;height:90vh;color:#334;font-size:16px">구글시트에서 최신 학사일정을 불러오는 중…</body>');
+  w.document.close();
+  freshForPrint().then(()=>{
+    if(w.closed)return;
+    let html;
+    if(isTable)html=tableDoc();
+    else{
+      let pref={p:'A4',m:'sem'};
+      try{const s=JSON.parse(localStorage.getItem('ac_print_pref')||'null');if(s&&s.p)pref=s;}catch(e){}
+      html=printDoc(pref.p==='A3'?'A3':'A4',pref.m==='year'?'year':'sem');
+    }
+    w.document.open();w.document.write(html);w.document.close();
+  });
 }
 
 /* ============================================================
