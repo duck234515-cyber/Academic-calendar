@@ -164,13 +164,13 @@
 
   /* ---------- month calendar ---------- */
   .months{display:grid;grid-template-columns:1fr;gap:18px}
-  .monthnav{position:sticky;top:58px;z-index:25;display:flex;gap:6px;flex-wrap:wrap;
+  .monthnav{position:sticky;top:var(--tbh,58px);z-index:25;display:flex;gap:6px;flex-wrap:wrap;
     background:var(--bg);padding:10px 0 8px;margin:0 0 10px;border-bottom:1.5px solid var(--line)}
   .monthnav button{border:1.5px solid var(--line-strong);background:var(--surface);border-radius:999px;
     padding:6px 13px;font:inherit;font-size:13px;font-weight:700;color:var(--text);cursor:pointer}
   .monthnav button:hover{border-color:var(--brand);color:var(--brand)}
   .monthnav button.on{background:var(--brand);border-color:var(--brand);color:#fff}
-  .month[id]{scroll-margin-top:118px}
+  .month[id]{scroll-margin-top:calc(var(--tbh,58px) + var(--mnh,52px) + 8px)}
   @media (min-width:881px){
     table.cal td{height:82px}
     table.cal td .n{font-size:14.5px}
@@ -349,6 +349,11 @@
   }
   @media (max-width:640px){
     .wrap{padding:16px 12px calc(32px + env(safe-area-inset-bottom, 0px))}
+    /* 월 바로가기 : 한 줄 가로 스크롤 (두 줄로 쌓여 화면을 가리지 않게) */
+    .monthnav{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+      margin:0 -12px 10px;padding:8px 12px}
+    .monthnav::-webkit-scrollbar{display:none}
+    .monthnav button{flex:none;padding:6px 12px}
     /* 월력 : 칸이 좁아 글자는 한 줄 말줄임, 학사(글자) 일정은 아래 '이달의 주요 일정'에서 */
     table.cal th{font-size:11px;padding:6px 0}
     table.cal td{height:52px;padding:3px 2px}
@@ -1332,16 +1337,34 @@ function wireMonthNav(){
     const el=document.getElementById(b.dataset.t);
     if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
   });
+  measureSticky();lastOn='';
   updateMonthNav();
 }
+/* 고정 위치 계산 : 상단 바가 고정(넓은 화면)일 때만 그 높이만큼 아래에 붙이고, 모바일처럼 고정이 풀리면 화면 맨 위에 붙임 */
+function measureSticky(){
+  const tb=document.querySelector('.topbar'),nav=$('#monthnav'),rs=document.documentElement.style;
+  const tbh=tb&&getComputedStyle(tb).position==='sticky'?tb.offsetHeight:0;
+  rs.setProperty('--tbh',tbh+'px');
+  if(nav&&nav.offsetHeight)rs.setProperty('--mnh',nav.offsetHeight+'px');
+  return tbh+(nav?nav.offsetHeight:0);
+}
+let lastOn='';
 function updateMonthNav(){
   const nav=$('#monthnav');
   if(!nav||!calMonthEls.length||V.view!=='cal')return;
+  const line=nav.getBoundingClientRect().bottom+12;   // 월 바로가기 바로 아래를 지나간 달 = 현재 달
   let cur=calMonthEls[0].id;
-  calMonthEls.forEach(el=>{if(el.getBoundingClientRect().top<=130)cur=el.id;});
+  calMonthEls.forEach(el=>{if(el.getBoundingClientRect().top<=line)cur=el.id;});
+  const de=document.documentElement;   // 맨 아래까지 내렸으면 마지막 달(더 올라갈 수 없어 기준선에 닿지 못함)
+  if(window.innerHeight+window.scrollY>=de.scrollHeight-2){
+    const last=calMonthEls[calMonthEls.length-1];if(last.getBoundingClientRect().top<window.innerHeight)cur=last.id;}
   nav.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t===cur));
+  if(cur!==lastOn){lastOn=cur;   // 한 줄 스크롤(모바일)에서 현재 달 버튼이 보이도록
+    const b=nav.querySelector('button.on');
+    if(b&&nav.scrollWidth>nav.clientWidth)nav.scrollTo({left:b.offsetLeft-(nav.clientWidth-b.offsetWidth)/2,behavior:'smooth'});}
 }
 window.addEventListener('scroll',()=>{requestAnimationFrame(updateMonthNav);},{passive:true});
+window.addEventListener('resize',()=>{measureSticky();updateMonthNav();});
 
 function buildTableHTML(data,sem){
   const t=data.t;
