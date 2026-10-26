@@ -483,6 +483,150 @@
   table.weeks td.bigo{font-size:10px;line-height:1.18}
   table.weeks td.bigo .chip{font-size:9px;padding:1px 5px;margin:1px 2px 1px 0}
 
+  /* =====================================================================
+     Liquid Glass 테마 (Apple iOS 26 스타일) — 화면 전용, 인쇄·PDF에는 적용 안 함
+     ===================================================================== */
+  @media screen{
+  :root{
+    --accent:#0a6fe8; --accent-dark:#0656b8; --accent-soft:rgba(10,111,232,.12); --accent-line:rgba(10,111,232,.45);
+    --text:#111827; --muted:#5b6474; --faint:#8b93a1;
+    --border:rgba(17,24,39,.10); --border-strong:rgba(17,24,39,.16); --grid:rgba(17,24,39,.11); --panel:rgba(255,255,255,.5);
+    --surface:rgba(255,255,255,.58);
+    --glass:rgba(255,255,255,.58); --glass-hi:rgba(255,255,255,.8); --glass-edge:rgba(255,255,255,.75);
+    --blur:saturate(180%) blur(22px);
+    --r-xl:26px; --r-lg:20px; --r-md:14px; --r-sm:11px;
+    --shadow:0 1px 1px rgba(15,23,42,.04),0 8px 28px rgba(15,35,80,.10);
+    --shadow-lg:0 2px 4px rgba(15,23,42,.05),0 22px 60px rgba(15,35,80,.18);
+    --hi:inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(255,255,255,.35),inset 0 0 0 1px rgba(255,255,255,.45);
+    --spring:cubic-bezier(.32,.72,0,1);
+    --off-bg:rgba(239,68,68,.13); --mark-bg:rgba(34,160,70,.14); --exam-bg:rgba(14,145,190,.15); --event-bg:rgba(230,140,20,.15);
+    --head-bg:rgba(255,255,255,.6); --head-text:#5b6474;
+  }
+  html{-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Apple SD Gothic Neo","Pretendard","Malgun Gothic","맑은 고딕",system-ui,sans-serif;
+    background:#eef2f8;letter-spacing:-.1px}
+  body::before{content:"";position:fixed;inset:-20vmax;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(38vmax 38vmax at 10% 6%,rgba(10,111,232,.28),transparent 70%),
+      radial-gradient(34vmax 34vmax at 90% 10%,rgba(42,170,120,.20),transparent 70%),
+      radial-gradient(40vmax 40vmax at 80% 85%,rgba(140,90,240,.18),transparent 70%),
+      radial-gradient(36vmax 36vmax at 8% 90%,rgba(255,170,60,.15),transparent 70%),
+      linear-gradient(180deg,#f4f7fc,#e9eef7);
+    animation:lgDrift 38s ease-in-out infinite alternate}
+  @keyframes lgDrift{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(-3vmax,2vmax,0) scale(1.06)}}
+
+  /* 공통 유리 면 */
+  header.app,.toolbar,.card,.stat,.tablewrap,.month,.holsum,.schedule,#weekcheck,.printtip{
+    background:var(--glass)!important;-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+    border:1px solid var(--glass-edge)!important;box-shadow:var(--hi),var(--shadow)!important}
+  .card,.stat,.tablewrap,.month,.holsum,.schedule,#weekcheck,.printtip{border-radius:var(--r-xl)!important;overflow:hidden}
+  .sidebar>.card{flex-shrink:0}
+  @media (min-width:1081px){.maintop{background:rgba(236,241,248,.55)!important;-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+    border-radius:0 0 var(--r-xl) var(--r-xl);margin-left:-10px;margin-right:-10px;padding-left:10px;padding-right:10px}}
+  .addform .btn{border-radius:999px!important}
+  .toolbar .seg button{padding:6px 12px}
+
+  /* ---------- 머리 · 설정 줄 ---------- */
+  header.app{margin:12px 12px 0;border-radius:var(--r-xl)!important;padding:14px 20px 12px}
+  header.app .hacts{border-top:1px solid var(--border)}
+  header.app h1{font-weight:800;letter-spacing:-.4px}
+  .ver{border-radius:999px;padding:2px 9px}
+  .toolbar{margin:10px 12px 0;border-radius:var(--r-lg)!important;padding:14px 20px}
+  @media (min-width:1081px){.toolbar{top:8px}}
+  .printtip{margin:14px 12px 0;border-radius:var(--r-lg)!important}
+  .layout{padding:18px 12px 28px}
+
+  /* ---------- 버튼 : 알약 모양 + 눌림 스프링 ---------- */
+  .btn{border-radius:999px!important;background:rgba(255,255,255,.62);border:1px solid rgba(17,24,39,.09);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 1px 2px rgba(15,23,42,.05);
+    transition:transform .45s var(--spring),background-color .2s,box-shadow .25s,border-color .2s,color .2s}
+  .btn:hover{background:rgba(255,255,255,.9);border-color:rgba(10,111,232,.25)}
+  .btn.primary{background:linear-gradient(180deg,#2a86f5,var(--accent))!important;border-color:transparent!important;color:#fff;
+    box-shadow:0 6px 16px rgba(10,111,232,.30),inset 0 1px 0 rgba(255,255,255,.35)}
+  .btn.primary:hover{background:linear-gradient(180deg,#3a90f7,#0a66d8)!important}
+  .btn.ghost{background:transparent;border-color:transparent;box-shadow:none}
+  .btn.ghost:hover{background:rgba(255,255,255,.6)}
+  button,.item .x,.toggle{transition:transform .45s var(--spring),background-color .25s,color .2s,box-shadow .25s}
+  button:active:not(:disabled),.btn:active,.item .x:active,.toggle:active{transform:scale(.95)}
+
+  /* ---------- 입력칸 ---------- */
+  .control,select.control,input.control{border-radius:var(--r-sm)!important;background:rgba(255,255,255,.72);
+    border:1px solid rgba(17,24,39,.12);transition:box-shadow .25s,border-color .25s,background .25s}
+  .control:focus{background:#fff;border-color:rgba(10,111,232,.5);box-shadow:0 0 0 4px rgba(10,111,232,.14)}
+  .dwrap .dpick{background:transparent;border-left:1px solid rgba(17,24,39,.08);border-radius:0 var(--r-sm) var(--r-sm) 0}
+
+  /* ---------- iOS 세그먼트 컨트롤 (흰 알약이 미끄러짐) ---------- */
+  .seg,.viewtabs{position:relative;background:rgba(118,118,128,.13)!important;border:0!important;border-radius:12px!important;
+    padding:3px;gap:0;height:auto;box-shadow:inset 0 0 0 1px rgba(255,255,255,.4)}
+  .seg button,.viewtabs button{position:relative;z-index:1;background:transparent!important;border:0!important;border-radius:9px!important;
+    color:var(--text);padding:7px 16px;min-height:32px}
+  .seg button.on,.viewtabs button.on{color:var(--text)!important;font-weight:700}
+  .seg.kind button{border-right:0!important}
+  .segpill{position:absolute;z-index:0;top:3px;bottom:3px;left:0;width:0;border-radius:9px;background:#fff;
+    box-shadow:0 3px 8px rgba(0,0,0,.12),0 1px 1px rgba(0,0,0,.04);transition:transform .5s var(--spring),width .5s var(--spring)}
+  .seg:not(.has-pill) button.on,.viewtabs:not(.has-pill) button.on{background:#fff!important;box-shadow:0 3px 8px rgba(0,0,0,.12)}
+  .viewtabs{display:inline-flex}
+
+  /* ---------- 카드 머리 : 단색 띠 대신 깔끔한 제목 ---------- */
+  .card .hd,.ttitle,.month .mh,.holsum .ttl,.schedule .ttl{background:transparent!important;border-bottom:1px solid var(--border)!important;color:var(--text)!important}
+  .card .hd h2,.ttitle h3{color:var(--text)!important;font-size:14.5px;font-weight:800}
+  .card .hd .icon,.ttitle .icon,.month .mh .icon,.schedule .ttl .icon{color:var(--accent)!important;stroke:var(--accent)!important}
+  .ttitle .sub{color:var(--muted)!important}
+  .card .hd .count{background:rgba(10,111,232,.12)!important;color:var(--accent)!important;border-radius:999px!important}
+  .month .mh{font-size:17px;font-weight:800;letter-spacing:-.4px}
+
+  /* ---------- 일정 목록·토글·태그 ---------- */
+  .item{border-radius:var(--r-md)!important;background:rgba(255,255,255,.55);border:1px solid rgba(255,255,255,.7);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 1px 2px rgba(15,23,42,.04);transition:transform .45s var(--spring),background .2s}
+  .item:hover{background:rgba(255,255,255,.8)}
+  .tag,.card .hd .count,table.weeks td.bigo .chip,table.weeks td.mark .badge,.legend i{border-radius:999px!important}
+  .legend i{border-radius:5px!important}
+  .item .x{border-radius:50%!important}
+  .toggle{width:46px!important;height:28px!important;border-radius:999px!important;background:rgba(120,120,128,.25)}
+  .toggle.on{background:#34c759!important}
+  .toggle::after{top:2px!important;left:2px!important;width:24px!important;height:24px!important;border-radius:50%!important;
+    background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.18),0 1px 1px rgba(0,0,0,.08);transition:left .45s var(--spring)!important}
+  .toggle.on::after{left:20px!important}
+
+  /* ---------- 요약 타일 ---------- */
+  .stat{border-radius:var(--r-lg)!important}
+  .stat .v{font-variant-numeric:tabular-nums}
+  .stat.hl{background:linear-gradient(150deg,rgba(52,199,89,.92),rgba(30,150,70,.9))!important;border-color:rgba(255,255,255,.4)!important}
+  #weekcheck{border-width:1px!important}
+  #weekcheck.warn{background:linear-gradient(135deg,rgba(255,80,70,.14),rgba(255,255,255,.55))!important}
+  #weekcheck.ok{background:linear-gradient(135deg,rgba(52,199,89,.16),rgba(255,255,255,.55))!important}
+  #weekcheck.over{background:linear-gradient(135deg,rgba(255,170,40,.16),rgba(255,255,255,.55))!important}
+  #weekcheck .wdchip{border-radius:999px!important;background:rgba(255,255,255,.7)}
+  #weekcheck .wdchip.bad{background:#ff3b30;border-color:#ff3b30;color:#fff}
+
+  /* ---------- 표·달력 ---------- */
+  table.weeks thead th,table.hs th{background:rgba(255,255,255,.55)!important;color:var(--muted)!important}
+  table.weeks td.wk,table.hs td.lab{background:rgba(10,111,232,.07)!important;color:var(--accent)!important}
+  table.weeks td.exam{background:rgba(14,145,190,.20)}
+  table.weeks td.makeup,table.cal td.mk{background:linear-gradient(160deg,#8b3fae,#6f2690)!important}
+  table.weeks tbody tr:hover td{background-color:rgba(255,255,255,.45)}
+  .tfoot{background:rgba(255,255,255,.35)!important;border-top:1px solid var(--border)!important}
+  table.cal td.out{background:rgba(255,255,255,.25)}
+  .month .mevents{background:rgba(255,255,255,.3)!important;border-top:1px solid var(--border)!important}
+
+  /* ---------- 알림(토스트) : 떠 있는 유리 캡슐 ---------- */
+  #toast{border-radius:999px!important;background:rgba(28,30,36,.78)!important;-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+    box-shadow:0 12px 34px rgba(0,0,0,.25)!important;padding:12px 22px;
+    transition:opacity .3s ease,transform .55s var(--spring)!important;transform:translateX(-50%) translateY(24px) scale(.96)}
+  #toast.show{transform:translateX(-50%) translateY(0) scale(1)}
+
+  /* ---------- 화면 전환 ---------- */
+  .lg-in{animation:lgViewIn .5s var(--spring) both}
+  @keyframes lgViewIn{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
+
+  @media (max-width:760px){
+    header.app,.toolbar,.printtip{margin-left:8px;margin-right:8px}
+    .layout{padding:14px 8px 24px}
+    .card,.stat,.tablewrap,.month,.holsum,.schedule{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:rgba(255,255,255,.8)!important}
+    .card,.tablewrap,.month,.holsum,.schedule{border-radius:var(--r-lg)!important}
+  }
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+  }
   /* ===== 인쇄 / PDF : [1장] 수업일수표 · [2~3장] 학사월력 (A4) ===== */
   @media print{
     @page{size:A4 portrait;margin:7mm}
@@ -2036,6 +2180,38 @@ document.querySelectorAll('.viewtabs button').forEach(b=>b.onclick=()=>{
   $('#viewTable').style.display=state.view==='table'?'':'none';
   $('#viewCal').style.display=state.view==='cal'?'':'none';
 });
+/* ============================================================
+   Liquid Glass 동작 : 세그먼트(학기·종류·보기 전환)의 흰 알약이 선택 항목으로 미끄러짐,
+   수업일수표 ↔ 학사 월력 전환 애니메이션 (동작 줄이기 설정 시 끔)
+   ============================================================ */
+(function(){
+  const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const segs=[...document.querySelectorAll('.seg,.viewtabs')];
+  const place=(box,pill,instant)=>{
+    const b=box.querySelector('button.on');if(!b||!b.offsetWidth){pill.style.opacity='0';return;}
+    pill.style.opacity='1';
+    if(instant)pill.style.transition='none';
+    pill.style.width=b.offsetWidth+'px';pill.style.transform=`translateX(${b.offsetLeft}px)`;
+    if(instant){void pill.offsetWidth;pill.style.transition='';}
+  };
+  segs.forEach(box=>{
+    const pill=document.createElement('span');pill.className='segpill';box.prepend(pill);box.classList.add('has-pill');
+    let first=true;
+    const upd=()=>{place(box,pill,first||reduce);first=false;};
+    new MutationObserver(upd).observe(box,{subtree:true,attributes:true,attributeFilter:['class']});
+    upd();
+    box._lgUpd=()=>place(box,pill,true);
+  });
+  const all=()=>segs.forEach(b=>b._lgUpd&&b._lgUpd());
+  addEventListener('resize',all);
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(all);
+  setTimeout(all,300);
+  if(!reduce)document.querySelectorAll('.viewtabs button').forEach(b=>b.addEventListener('click',()=>{
+    const el=document.getElementById(b.dataset.view==='cal'?'viewCal':'viewTable');
+    if(el){el.classList.remove('lg-in');void el.offsetWidth;el.classList.add('lg-in');}
+  }));
+})();
+
 
 /* ---- 엑셀(.xls) 내보내기 : PDF 출력물과 동일 양식 (1·2학기 수업일수표 + 휴일 안내 + 연간 학사일정) ---- */
 $('#btnXls').onclick=()=>{
@@ -2801,7 +2977,8 @@ $('#btnSheetPush').onclick=pushToSheet;
 /* 고정 영역 위치: 툴바 실제 높이를 측정해 그 아래에 요약·사이드바를 붙임 */
 function setStickyTop(){
   const tb=document.querySelector('.toolbar');
-  document.documentElement.style.setProperty('--stickytop',(tb?tb.offsetHeight:72)+'px');
+  const tbTop=tb?(parseFloat(getComputedStyle(tb).top)||0):0;   // 떠 있는 유리 설정 줄 : 위 여백 포함
+  document.documentElement.style.setProperty('--stickytop',(tb?tb.offsetHeight+tbTop+6:72)+'px');
 }
 window.addEventListener('resize',setStickyTop);
 
