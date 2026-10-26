@@ -381,6 +381,230 @@
     table.hs td .hname{font-size:10px}
     .hsnote{padding:8px 11px;font-size:11.5px}
   }
+  /* =====================================================================
+     Liquid Glass 테마 (Apple iOS 26 스타일)
+     — 반투명 유리 면(배경 흐림·채도), 가장자리 하이라이트, 큰 둥근 모서리,
+       스프링 애니메이션. 인쇄물에는 적용하지 않음(@media print에서 해제)
+     ===================================================================== */
+  :root{
+    --brand:#0a6fe8; --brand-dark:#0656b8; --brand-soft:rgba(10,111,232,.12);
+    --text:#111827; --muted:#5b6474; --faint:#8b93a1;
+    --line:rgba(17,24,39,.08); --line-strong:rgba(17,24,39,.14);
+    --glass:rgba(255,255,255,.58); --glass-hi:rgba(255,255,255,.78); --glass-lo:rgba(255,255,255,.38);
+    --glass-edge:rgba(255,255,255,.75);
+    --blur:saturate(180%) blur(22px);
+    --r-xl:28px; --r-lg:22px; --r-md:16px; --r-sm:12px;
+    --shadow:0 1px 1px rgba(15,23,42,.04),0 8px 28px rgba(15,35,80,.10);
+    --shadow-lg:0 2px 4px rgba(15,23,42,.05),0 22px 60px rgba(15,35,80,.18);
+    --hi:inset 0 1px 0 rgba(255,255,255,.95),inset 0 -1px 0 rgba(255,255,255,.35),inset 0 0 0 1px rgba(255,255,255,.45);
+    --spring:cubic-bezier(.32,.72,0,1);
+    --spring-pop:cubic-bezier(.34,1.56,.64,1);
+    --hol-bg:rgba(239,68,68,.12); --term-bg:rgba(34,160,70,.13); --exam-bg:rgba(14,145,190,.13);
+    --event-bg:rgba(230,140,20,.14);
+  }
+  html{-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Apple SD Gothic Neo","Pretendard","Malgun Gothic","맑은 고딕",system-ui,sans-serif;
+    background:#eef2f8;letter-spacing:-.15px;
+  }
+  /* 유리 뒤로 비치는 배경 : 은은한 색 번짐 (천천히 움직임) */
+  body::before{content:"";position:fixed;inset:-20vmax;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(38vmax 38vmax at 12% 8%,rgba(10,111,232,.30),transparent 70%),
+      radial-gradient(34vmax 34vmax at 88% 12%,rgba(42,170,120,.22),transparent 70%),
+      radial-gradient(40vmax 40vmax at 78% 82%,rgba(140,90,240,.20),transparent 70%),
+      radial-gradient(36vmax 36vmax at 10% 88%,rgba(255,170,60,.16),transparent 70%),
+      linear-gradient(180deg,#f4f7fc,#e9eef7);
+    animation:lgDrift 38s ease-in-out infinite alternate}
+  @keyframes lgDrift{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(-3vmax,2vmax,0) scale(1.06)}}
+
+  /* 공통 유리 면 */
+  .semcard,.month,.tablewrap,.holsum,.lmonth,.upcoming,.fbbar,.priobar,.pubbar,.sres,.searchbar input,
+  .yearnav .arrow,.yearnav select,.monthnav{
+    background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+    border:1px solid var(--glass-edge);box-shadow:var(--hi),var(--shadow)}
+
+  /* ---------- 상단 바 : 떠 있는 파란 유리 캡슐 ---------- */
+  .topbar{position:sticky;top:10px;margin:10px auto 0;width:min(1200px,calc(100% - 20px));
+    border-radius:var(--r-lg);padding:0 14px 0 16px;min-height:60px;
+    background:linear-gradient(135deg,rgba(10,111,232,.82),rgba(6,86,184,.78));
+    -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+    border:1px solid rgba(255,255,255,.35);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(255,255,255,.12),0 10px 30px rgba(6,60,140,.28)}
+  .topbar .brand .ci-em{box-shadow:0 2px 8px rgba(0,0,0,.18)}
+  /* 보기 전환 : iOS 세그먼트 컨트롤 (흰 알약이 미끄러져 이동) */
+  .tabs{position:relative;gap:2px;padding:4px;margin:8px 0;border-radius:999px;
+    background:rgba(255,255,255,.16);box-shadow:inset 0 1px 2px rgba(0,0,0,.12),inset 0 0 0 1px rgba(255,255,255,.18)}
+  .tabs button{position:relative;z-index:1;background:transparent!important;border-radius:999px;color:rgba(255,255,255,.92);
+    padding:8px 16px;transition:color .35s var(--spring),transform .45s var(--spring)}
+  .tabs button.on{color:var(--brand-dark)}
+  .tabs .tabpill{position:absolute;z-index:0;top:4px;bottom:4px;left:0;width:0;border-radius:999px;
+    background:linear-gradient(180deg,#fff,rgba(255,255,255,.92));
+    box-shadow:0 3px 10px rgba(0,30,80,.22),inset 0 1px 0 #fff;
+    transition:transform .55s var(--spring),width .55s var(--spring)}
+  .btnprint{border-radius:999px;border:1px solid rgba(255,255,255,.38);background:rgba(255,255,255,.14);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+  .btnprint:hover{background:rgba(255,255,255,.24)}
+
+  /* ---------- 눌림·전환 애니메이션 (iOS 스프링) ---------- */
+  button,.uchip,.sres .srow{transition:transform .45s var(--spring),background-color .25s ease,color .25s ease,box-shadow .3s ease,border-color .25s ease,opacity .2s}
+  button:active:not(:disabled),.sres .srow:active{transform:scale(.95)}
+  .tabs button:active{transform:scale(.93)}
+
+  /* ---------- 머리 영역 ---------- */
+  .wrap{padding-top:26px}
+  .yearnav h1{font-size:34px;font-weight:800;letter-spacing:-1px}
+  .yearnav .arrow{width:42px;height:42px;color:var(--brand)}
+  .yearnav .arrow:hover{background:var(--glass-hi);border-color:var(--glass-edge)}
+  .yearnav select{border-radius:999px;padding:8px 14px}
+  .srcline .syncbtn{border-radius:999px;background:var(--glass);border:1px solid var(--glass-edge);box-shadow:var(--hi);padding:3px 11px}
+  .searchbar input{border-radius:var(--r-md);padding:12px 16px 12px 40px;font-size:14.5px;transition:box-shadow .3s ease,background .3s ease}
+  .searchbar input:focus{background:var(--glass-hi);border-color:rgba(10,111,232,.45);box-shadow:var(--hi),0 0 0 4px rgba(10,111,232,.16),var(--shadow)}
+  .searchbar .si{left:15px}
+  .sres{border-radius:var(--r-md);background:var(--glass-hi);box-shadow:var(--hi),var(--shadow-lg);padding:6px;
+    transform-origin:top center;animation:lgPop .38s var(--spring)}
+  .sres .srow{border-radius:var(--r-sm)}
+  .sres .srow:hover{background:rgba(10,111,232,.09)}
+  .sres .sy{border-radius:999px}
+  @keyframes lgPop{from{opacity:0;transform:scale(.96) translateY(-6px)}to{opacity:1;transform:none}}
+
+  .fbbar,.priobar,.pubbar{border-radius:var(--r-lg);padding:14px 18px}
+  .fbbar{background:linear-gradient(135deg,rgba(255,236,170,.62),rgba(255,248,225,.55))}
+  .priobar{background:linear-gradient(135deg,rgba(10,111,232,.14),rgba(255,255,255,.55))}
+  .fbbar button,.priobar button,.pubbar button{border-radius:999px;padding:10px 18px;
+    background:linear-gradient(180deg,#2a86f5,var(--brand));box-shadow:0 6px 16px rgba(10,111,232,.32),inset 0 1px 0 rgba(255,255,255,.35)}
+
+  /* ---------- 학기 카드 ---------- */
+  .semcards{gap:16px}
+  .semcard{border-radius:var(--r-xl);overflow:hidden}
+  .semcard .sh{background:transparent;color:var(--text);padding:16px 20px 6px}
+  .semcard .sh h2{font-size:17px;font-weight:800;display:inline-flex;align-items:center;gap:8px}
+  .semcard .sh h2::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 4px rgba(10,111,232,.15)}
+  .semcard .sh .period{color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums}
+  .semcard .sb{border-bottom:0;margin:6px 12px 0;gap:8px}
+  .semcard .cell{border-right:0;border-radius:var(--r-md);background:rgba(255,255,255,.45);box-shadow:inset 0 0 0 1px rgba(255,255,255,.6)}
+  .semcard .cell .v{font-size:23px;font-weight:800;font-variant-numeric:tabular-nums}
+  .semcard .qline{background:transparent;padding:12px 20px 16px}
+
+  .upcoming{border-radius:var(--r-lg)}
+  .uchip{border-radius:999px;border-color:transparent;box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
+  .uchip .dd{border-radius:999px}
+
+  /* ---------- 범례·월 바로가기 ---------- */
+  .legend i{border-radius:5px}
+  .monthnav{top:calc(var(--tbh,80px) + 6px);border-radius:var(--r-lg);padding:7px;margin:0 0 14px;gap:4px;border-bottom:1px solid var(--glass-edge)}
+  .monthnav button{border:0;background:transparent;border-radius:999px;padding:7px 13px;color:var(--text)}
+  .monthnav button:hover{background:rgba(255,255,255,.6);color:var(--brand)}
+  .monthnav button.on{background:linear-gradient(180deg,#2a86f5,var(--brand));color:#fff;
+    box-shadow:0 4px 12px rgba(10,111,232,.35),inset 0 1px 0 rgba(255,255,255,.35)}
+  .month[id]{scroll-margin-top:calc(var(--tbh,80px) + var(--mnh,52px) + 18px)}
+
+  /* ---------- 월 달력 카드 ---------- */
+  .months{gap:20px}
+  .month{border-radius:var(--r-xl)}
+  .month .mh{background:transparent;color:var(--text);font-size:20px;font-weight:800;letter-spacing:-.6px;padding:16px 20px 10px}
+  .month .mh .icon{color:var(--brand)}
+  table.cal th{background:transparent;border-bottom:1px solid var(--line);color:var(--faint);font-weight:700}
+  table.cal td{border:0;border-top:1px solid var(--line);border-left:1px solid var(--line);background:transparent;transition:background-color .25s ease}
+  table.cal tr td:first-child{border-left:0}
+  table.cal td.out{background:rgba(255,255,255,.22)}
+  table.cal td.mk{background:linear-gradient(160deg,#8b3fae,#6f2690)}
+  table.cal td.today{outline:2px solid var(--brand);outline-offset:-3px;border-radius:12px;background:rgba(10,111,232,.08)}
+  table.cal td.today .n::after{border-radius:999px;padding:1px 6px}
+  table.cal td.hl{border-radius:12px}
+  .month .mevents{background:rgba(255,255,255,.32);border-top:1px solid var(--line);padding:12px 18px 14px}
+  .month .mevents .me{border-left-width:3px;border-radius:2px}
+
+  /* ---------- 수업일수표 ---------- */
+  .semtitle .bar{border-radius:999px}
+  .tablewrap,.holsum{border-radius:var(--r-xl)}
+  table.weeks th,table.weeks td{border-color:var(--line)}
+  table.weeks thead th{background:rgba(255,255,255,.55);color:var(--muted);font-weight:800}
+  table.weeks td{background:transparent}
+  table.weeks td.wk{background:rgba(10,111,232,.07);color:var(--brand)}
+  table.weeks td.pad:not(.off){background:rgba(255,255,255,.25)}
+  table.weeks td.makeup{background:linear-gradient(160deg,#8b3fae,#6f2690)}
+  table.weeks td.mark .badge,table.weeks td.bigo .chip{border-radius:999px}
+  .tfoot{background:rgba(255,255,255,.35);border-top:1px solid var(--line)}
+  .holsum .ttl{background:transparent;color:var(--text);font-size:16px;padding:14px 18px 8px}
+  table.hs th{background:rgba(255,255,255,.55);color:var(--muted)}
+  table.hs td.lab{background:rgba(10,111,232,.07);color:var(--brand)}
+  .hsnote{border-top:1px solid var(--line)}
+
+  /* ---------- 전체 일정 ---------- */
+  .listwrap{gap:18px}
+  .lmonth{border-radius:var(--r-xl)}
+  .lmonth .lh{background:transparent;color:var(--text);font-size:19px;font-weight:800;padding:16px 20px 6px}
+  .lmonth .lb{padding:6px 20px 14px}
+  .lrow{border-bottom:1px solid var(--line)}
+
+  /* ---------- 의견 제출 : iOS 시트 ---------- */
+  .fbmodal{background:rgba(10,20,40,.28);-webkit-backdrop-filter:blur(8px) saturate(120%);backdrop-filter:blur(8px) saturate(120%);
+    animation:lgFade .3s ease}
+  .fbbox{border-radius:var(--r-xl);background:rgba(255,255,255,.82);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+    border:1px solid var(--glass-edge);box-shadow:var(--hi),var(--shadow-lg);animation:lgSheet .55s var(--spring)}
+  .fbbox input[type=text],.fbbox input[type=date],.fbbox select,.fbbox textarea{border-radius:var(--r-sm);
+    border:1px solid var(--line-strong);background:rgba(255,255,255,.7);transition:box-shadow .25s ease,border-color .25s ease}
+  .fbbox input:focus,.fbbox select:focus,.fbbox textarea:focus{outline:none;border-color:rgba(10,111,232,.5);box-shadow:0 0 0 4px rgba(10,111,232,.14)}
+  .fbtypes button,.fbbtns button,.rvbtn{border-radius:999px;border:1px solid var(--line-strong);background:rgba(255,255,255,.65)}
+  .fbtypes button.on,.fbbtns button.pri{background:linear-gradient(180deg,#2a86f5,var(--brand));border-color:transparent;color:#fff;
+    box-shadow:0 6px 16px rgba(10,111,232,.3),inset 0 1px 0 rgba(255,255,255,.35)}
+  .fbbox h2 .fbclose{width:30px;height:30px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;
+    background:rgba(120,130,150,.16);font-size:18px}
+  @keyframes lgFade{from{opacity:0}to{opacity:1}}
+  @keyframes lgSheet{from{opacity:0;transform:translateY(40px) scale(.97)}to{opacity:1;transform:none}}
+
+  /* ---------- 화면 전환·등장 애니메이션 ---------- */
+  .lg-in{animation:lgViewIn .55s var(--spring) both}
+  @keyframes lgViewIn{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+  .lg-left{animation:lgSlideL .5s var(--spring) both}
+  .lg-right{animation:lgSlideR .5s var(--spring) both}
+  @keyframes lgSlideL{from{opacity:0;transform:translateX(-28px)}to{opacity:1;transform:none}}
+  @keyframes lgSlideR{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+  .lg-reveal{opacity:0;transform:translateY(22px) scale(.98);transition:opacity .6s ease,transform .7s var(--spring)}
+  .lg-reveal.lg-shown{opacity:1;transform:none}
+
+  /* ---------- 태블릿·휴대폰 ---------- */
+  @media (max-width:900px){
+    .topbar{position:static;top:auto;width:calc(100% - 20px);padding:6px 12px 10px;border-radius:var(--r-lg)}
+    .tabs{margin:0}
+    .monthnav{top:8px}
+  }
+  /* 휴대폰 : 보기 전환을 화면 아래 떠 있는 유리 탭 바로 (iOS 탭 바) */
+  @media (max-width:640px){
+    .topbar{-webkit-backdrop-filter:none;backdrop-filter:none;background:linear-gradient(135deg,#0a6fe8,#0656b8);padding:8px 12px}
+    .tabs{position:fixed;z-index:50;left:14px;right:14px;bottom:calc(12px + env(safe-area-inset-bottom,0px));width:auto;
+      padding:6px;border-radius:30px;background:rgba(255,255,255,.62);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+      border:1px solid var(--glass-edge);box-shadow:var(--hi),0 12px 34px rgba(15,35,80,.22)}
+    .tabs button{flex-direction:column;gap:3px;padding:7px 4px;font-size:11px;font-weight:700;color:var(--muted)}
+    .tabs button .icon{font-size:21px}
+    .tabs button.on{color:var(--brand)}
+    .tabs .tabpill{top:6px;bottom:6px;background:rgba(10,111,232,.12);box-shadow:inset 0 0 0 1px rgba(10,111,232,.10)}
+    .wrap{padding-bottom:calc(108px + env(safe-area-inset-bottom,0px))}
+    .month,.tablewrap,.holsum,.lmonth,.semcard{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(255,255,255,.8)}   /* 휴대폰 성능 : 큰 카드는 흐림 대신 불투명도 */
+    footer{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
+    .yearnav h1{font-size:28px}
+    .semcard,.month,.tablewrap,.holsum,.lmonth{border-radius:var(--r-lg)}
+    .month .mh{font-size:18px;padding:14px 16px 8px}
+    .monthnav{margin:0 -4px 12px;padding:6px}
+    /* 의견 제출 : 아래에서 올라오는 시트 */
+    .fbmodal{align-items:flex-end;padding:0}
+    .fbbox{border-radius:var(--r-xl) var(--r-xl) 0 0;max-height:92vh;overflow:auto;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px));
+      animation:lgSheetUp .55s var(--spring)}
+    .fbbox::before{content:"";display:block;width:40px;height:5px;border-radius:3px;background:rgba(60,70,90,.25);margin:-8px auto 12px}
+    @keyframes lgSheetUp{from{transform:translateY(100%)}to{transform:none}}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important}
+    .lg-reveal{opacity:1;transform:none}
+  }
+  @media print{
+    body::before{display:none}
+    *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;box-shadow:none!important;animation:none!important}
+    .lg-reveal{opacity:1!important;transform:none!important}
+    .semcard,.month,.tablewrap,.holsum,.lmonth{background:#fff!important;border:1px solid #aab4c0!important}
+    .tabs{display:none!important}
+  }
   /* ---------- print ---------- */
   @media print{
     @page{size:A4 landscape;margin:8mm}
@@ -1328,6 +1552,8 @@ function renderCalendar(){
   $('#viewCal').innerHTML=html;
   wireMonthNav();
 }
+/* 바로가기 이동 전 : 아직 떠오르기 전(살짝 아래로 밀린) 카드를 제자리로 — 이동 위치가 어긋나지 않게 */
+function lgSettle(){document.querySelectorAll('.lg-reveal').forEach(e=>e.classList.remove('lg-reveal','lg-shown'));}
 /* 월 바로가기 : 버튼 클릭 시 해당 월로 스크롤 + 스크롤 위치에 따라 현재 월 표시 */
 let calMonthEls=[];
 function wireMonthNav(){
@@ -1335,7 +1561,7 @@ function wireMonthNav(){
   calMonthEls=[...document.querySelectorAll('.month[id^="m-"]')];
   nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{
     const el=document.getElementById(b.dataset.t);
-    if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+    if(el){lgSettle();el.scrollIntoView({behavior:'smooth',block:'start'});}
   });
   measureSticky();lastOn='';
   updateMonthNav();
@@ -1343,7 +1569,8 @@ function wireMonthNav(){
 /* 고정 위치 계산 : 상단 바가 고정(넓은 화면)일 때만 그 높이만큼 아래에 붙이고, 모바일처럼 고정이 풀리면 화면 맨 위에 붙임 */
 function measureSticky(){
   const tb=document.querySelector('.topbar'),nav=$('#monthnav'),rs=document.documentElement.style;
-  const tbh=tb&&getComputedStyle(tb).position==='sticky'?tb.offsetHeight:0;
+  const cs=tb&&getComputedStyle(tb);
+  const tbh=cs&&cs.position==='sticky'?tb.offsetHeight+(parseFloat(cs.top)||0):0;   // 떠 있는 상단 바 : 위 여백까지 포함
   rs.setProperty('--tbh',tbh+'px');
   if(nav&&nav.offsetHeight)rs.setProperty('--mnh',nav.offsetHeight+'px');
   return tbh+(nav?nav.offsetHeight:0);
@@ -1547,7 +1774,7 @@ function jumpTo(y,iso){
   const cell=document.querySelector(`#viewCal td[data-iso="${iso}"]`);
   const target=cell||document.getElementById(`m-${d.getFullYear()}-${d.getMonth()+1}`);
   if(target){
-    target.scrollIntoView({behavior:'smooth',block:'center'});
+    lgSettle();target.scrollIntoView({behavior:'smooth',block:'center'});
     if(cell){cell.classList.add('hl');setTimeout(()=>cell.classList.remove('hl'),2600);}
   }
 }
@@ -1789,6 +2016,42 @@ $('#btnAdmin').onclick=goAdmin;
 $('#lnkAdmin').onclick=e=>{e.preventDefault();goAdmin();};
 
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>{V.view=b.dataset.view;render();});
+
+/* ============================================================
+   Liquid Glass 동작 : 보기 탭의 흰 알약 이동, 화면 전환·학년도 이동 애니메이션,
+   스크롤하면 카드가 부드럽게 떠오르는 효과 (동작 줄이기 설정 시 끔)
+   ============================================================ */
+(function(){
+  const tabs=$('#tabs');if(!tabs)return;
+  const pill=document.createElement('span');pill.className='tabpill';tabs.prepend(pill);
+  function movePill(instant){
+    const b=tabs.querySelector('button.on');if(!b||!b.offsetWidth)return;
+    if(instant)pill.style.transition='none';
+    pill.style.width=b.offsetWidth+'px';pill.style.transform=`translateX(${b.offsetLeft}px)`;
+    if(instant){void pill.offsetWidth;pill.style.transition='';}
+  }
+  const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const io=('IntersectionObserver' in window)&&!reduce?new IntersectionObserver(es=>es.forEach(e=>{
+    if(e.isIntersecting){e.target.classList.add('lg-shown');io.unobserve(e.target);}}),{rootMargin:'0px 0px -6% 0px'}):null;
+  const anim=(el,c)=>{if(!el)return;el.classList.remove('lg-in','lg-left','lg-right');void el.offsetWidth;el.classList.add(c);};
+  let lastView=null,lastYear=null;
+  const baseRender=render;
+  render=function(){
+    baseRender.apply(this,arguments);
+    movePill(lastView===null);
+    const viewEl=$({cal:'#viewCal',table:'#viewTable',list:'#viewList'}[V.view]);
+    if(!reduce&&lastView!==null){
+      if(V.view!==lastView)anim(viewEl,'lg-in');
+      else if(V.year!==lastYear){const c=V.year>lastYear?'lg-right':'lg-left';anim($('#semcards'),c);anim(viewEl,c);}
+    }
+    if(io)document.querySelectorAll('.month,.lmonth,.tablewrap,.holsum').forEach(el=>{
+      if(el.getBoundingClientRect().top>innerHeight){el.classList.add('lg-reveal');io.observe(el);}});
+    lastView=V.view;lastYear=V.year;
+  };
+  addEventListener('resize',()=>movePill(true));
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>movePill(true));
+  window.addEventListener('beforeprint',()=>document.querySelectorAll('.lg-reveal').forEach(el=>el.classList.add('lg-shown')));
+})();
 $('#ySel').onchange=e=>{V.year=+e.target.value;render();};
 $('#yPrev').onclick=()=>{if(V.year>YEARS[0]){V.year--;render();}};
 $('#yNext').onclick=()=>{if(V.year<YEARS[YEARS.length-1]){V.year++;render();}};
